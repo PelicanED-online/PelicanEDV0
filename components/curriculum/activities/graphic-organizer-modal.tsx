@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
-import { Save } from "lucide-react"
 import { useRouter } from "next/navigation"
 import TableGraphicOrganizer from "./table-graphic-organizer"
+import { Save } from "lucide-react"
 
 interface ActivityType {
   id: string
@@ -70,8 +70,8 @@ export function GraphicOrganizerModal({
 
   // Table specific state
   const [tableData, setTableData] = useState<TableData>({
-    headers: [""],
-    rows: [{ id: generateId(), cells: [""] }],
+    headers: ["", ""],
+    rows: [{ id: generateId(), cells: ["", ""] }],
     headerCells: [],
     answerCells: [],
   })
@@ -286,11 +286,6 @@ export function GraphicOrganizerModal({
       content,
     })
     onOpenChange(false)
-    router.back()
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
   }
 
   const generateJson = () => {
@@ -302,6 +297,10 @@ export function GraphicOrganizerModal({
     }
     setJsonResult(JSON.stringify(content, null, 2))
     setStep("result")
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
   }
 
   return (
