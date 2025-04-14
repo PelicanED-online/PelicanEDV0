@@ -9,9 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useRouter } from "next/navigation"
+import TableGraphicOrganizer from "./table-graphic-organizer"
 import { Save } from "lucide-react"
 
 interface ActivityType {
@@ -71,8 +70,8 @@ export function GraphicOrganizerModal({
 
   // Table specific state
   const [tableData, setTableData] = useState<TableData>({
-    headers: ["", ""],
-    rows: [{ id: generateId(), cells: ["", ""] }],
+    headers: [""],
+    rows: [{ id: generateId(), cells: [""] }],
     headerCells: [],
     answerCells: [],
   })
@@ -83,7 +82,7 @@ export function GraphicOrganizerModal({
 
   // Multi-step form state
   const [step, setStep] = useState<"template" | "dimensions" | "data" | "result">("template")
-  const [columns, setColumns] = useState<number>(2)
+  const [columns, setColumns] = useState<number>(1)
   const [rows, setRows] = useState<number>(1)
   const [jsonResult, setJsonResult] = useState<string>("")
 
@@ -104,24 +103,24 @@ export function GraphicOrganizerModal({
         try {
           const content = initialData.content
           setTableData({
-            headers: content.headers || ["", ""],
-            rows: content.rows || [{ id: generateId(), cells: ["", ""] }],
+            headers: content.headers || [""],
+            rows: content.rows || [{ id: generateId(), cells: [""] }],
             headerCells: content.headerCells || [],
             answerCells: content.answerCells || [],
           })
-          setColumns(content.headers?.length || 2)
+          setColumns(content.headers?.length || 1)
           setRows(content.rows?.length || 1)
-          setStep("data")
+          setStep("result")
         } catch (error) {
           console.error("Error parsing table data:", error)
           // Reset to default if there's an error
           setTableData({
-            headers: ["", ""],
-            rows: [{ id: generateId(), cells: ["", ""] }],
+            headers: [""],
+            rows: [{ id: generateId(), cells: [""] }],
             headerCells: [],
             answerCells: [],
           })
-          setColumns(2)
+          setColumns(1)
           setRows(1)
           setStep("dimensions")
         }
@@ -142,12 +141,12 @@ export function GraphicOrganizerModal({
     // Reset table-specific data
     if (value === "Table") {
       setTableData({
-        headers: ["", ""],
-        rows: [{ id: generateId(), cells: ["", ""] }],
+        headers: [""],
+        rows: [{ id: generateId(), cells: [""] }],
         headerCells: [],
         answerCells: [],
       })
-      setColumns(2)
+      setColumns(1)
       setRows(1)
       setStep("dimensions")
     } else {
@@ -170,7 +169,12 @@ export function GraphicOrganizerModal({
       .fill(null)
       .map(() => Array(columns).fill(""))
 
-    setTableData(initialData)
+    setTableData({
+      headers: tableData.headers,
+      rows: initialData.map((row) => ({ id: generateId(), cells: row })),
+      headerCells: [],
+      answerCells: [],
+    })
     setHeaderCells([])
     setAnswerCells([])
     setStep("data")
@@ -234,7 +238,7 @@ export function GraphicOrganizerModal({
   }
 
   const removeColumn = (index: number) => {
-    if (tableData.headers.length <= 2) return // Minimum 2 columns
+    if (tableData.headers.length <= 1) return // Minimum 1 columns
 
     setTableData((prev) => ({
       ...prev,
@@ -256,30 +260,14 @@ export function GraphicOrganizerModal({
   }
 
   const removeRow = (id: string) => {
+    if (tableData.rows.length <= 1) return // Minimum 1 row
+
     setTableData((prev) => ({
       ...prev,
       rows: prev.rows.filter((row) => row.id !== id),
     }))
     setHeaderCells((prev) => prev.filter((cell) => cell.row !== id))
     setAnswerCells((prev) => prev.filter((cell) => cell.row !== id))
-  }
-
-  const generateJson = () => {
-    // Create a comprehensive JSON structure with metadata
-    const result: {
-      headers: string[]
-      rows: { id: string; cells: string[] }[]
-      headerCells: { row: number; col: number }[]
-      answerCells: { row: number; col: number }[]
-    } = {
-      headers: tableData.headers,
-      rows: tableData.rows,
-      headerCells: headerCells,
-      answerCells: answerCells,
-    }
-
-    setJsonResult(JSON.stringify(result, null, 2))
-    setStep("result")
   }
 
   const handleSaveTable = () => {
@@ -303,8 +291,60 @@ export function GraphicOrganizerModal({
     router.back()
   }
 
+  const generateJson = () => {
+    // Prepare data for JSON conversion
+    const headers = tableData.headers
+    const rows = tableData.rows
+
+    // Find the header and answer cells
+    const headerCells = tableData.headerCells
+    const answerCells = tableData.answerCells
+
+    // Convert table data to JSON format
+    const jsonData = rows.map((row) => {
+      const rowData: { [key: string]: string } = {}
+
+      row.cells.forEach((cell, index) => {
+        const headerCell = headerCells.find((h) => h.col === index)
+        const answerCell = answerCells.find((a) => a.col === index)
+
+        if (headerCell) {
+          // If it's a header cell, use its value as the key
+          rowData[cell] = "" // Initialize with an empty string
+        }
+      })
+
+      row.cells.forEach((cell, index) => {
+        const headerCell = headerCells.find((h) => h.col === index)
+        const answerCell = answerCells.find((a) => a.col === index)
+
+        if (headerCell) {
+          // If it's a header cell, use its value as the key
+          const headerValue = cell
+          const answerColIndex = index
+
+          // Find the corresponding answer cell in the same row
+          const answerCellInRow = answerCells.find((a) => a.row === rows.indexOf(row) && a.col === answerColIndex)
+
+          if (answerCellInRow) {
+            rowData[headerValue] = cell // Assign the value to the corresponding header
+          }
+        }
+      })
+
+      return rowData
+    })
+
+    // Convert JSON data to a formatted string
+    const jsonString = JSON.stringify(jsonData, null, 2)
+    setJsonResult(jsonString)
+    setStep("result")
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // Handle form submission logic here
+    console.log("Form submitted")
   }
 
   return (
@@ -345,7 +385,7 @@ export function GraphicOrganizerModal({
                     <Input
                       id="columns"
                       type="number"
-                      min="2"
+                      min="1"
                       max="20"
                       required
                       value={columns || ""}
@@ -379,7 +419,7 @@ export function GraphicOrganizerModal({
                   </Button>
                   <Button
                     onClick={handleDimensionsSubmit}
-                    disabled={columns <= 1 || rows <= 0}
+                    disabled={columns <= 0 || rows <= 0}
                     className="bg-[#ff3300] hover:bg-[#e62e00] text-white"
                   >
                     Continue to Data Entry
@@ -389,110 +429,16 @@ export function GraphicOrganizerModal({
             )}
 
             {formData.template_type === "Table" && step === "data" && (
-              <div className="space-y-6 pt-4">
-                <div className="mb-4">
-                  <p className="text-sm text-muted-foreground mb-2">For each cell, select its type:</p>
-                  <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-                    <li>
-                      <span className="font-medium">Normal</span> - Regular data cell
-                    </li>
-                    <li>
-                      <span className="font-medium">Header</span> - Used as property names in the JSON
-                    </li>
-                    <li>
-                      <span className="font-medium text-[#ff3300]">Answer</span> - Designated for student answers
-                    </li>
-                  </ul>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="p-2 border bg-gray-100 text-left w-24">Row/Col</th>
-                        {Array.from({ length: columns }).map((_, colIndex) => (
-                          <th key={colIndex} className="p-2 border bg-gray-100 text-center">
-                            <span>Col {colIndex + 1}</span>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tableData.rows.map((row, rowIndex) => (
-                        <tr key={row.id}>
-                          <td className="p-2 border bg-gray-50">
-                            <span>Row {rowIndex + 1}</span>
-                          </td>
-                          {row.cells.map((cell, cellIndex) => {
-                            return (
-                              <td
-                                key={cellIndex}
-                                className={cn(
-                                  "p-2 border",
-                                  isCellHeader(rowIndex, cellIndex) && "bg-blue-100",
-                                  isCellAnswer(rowIndex, cellIndex) && "bg-[#fff0ee]",
-                                )}
-                              >
-                                <div className="space-y-2">
-                                  <Input
-                                    value={cell}
-                                    onChange={(e) => handleDataChange(rowIndex, cellIndex, e.target.value)}
-                                    placeholder={
-                                      isCellHeader(rowIndex, cellIndex)
-                                        ? "Header name"
-                                        : isCellAnswer(rowIndex, cellIndex)
-                                          ? "Answer placeholder"
-                                          : "Value"
-                                    }
-                                    className={cn(
-                                      "focus-visible:ring-[#ff3300]",
-                                      isCellHeader(rowIndex, cellIndex) && "font-medium",
-                                      isCellAnswer(rowIndex, cellIndex) && "border-[#ff3300] bg-[#fff5f3]",
-                                    )}
-                                  />
-                                  <ToggleGroup
-                                    type="single"
-                                    size="sm"
-                                    value={getCellType(rowIndex, cellIndex)}
-                                    onValueChange={(value) => {
-                                      if (value) setCellType(rowIndex, cellIndex, value)
-                                    }}
-                                    className="justify-center"
-                                  >
-                                    <ToggleGroupItem value="normal" className="text-xs px-2">
-                                      Normal
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem value="header" className="text-xs px-2">
-                                      Header
-                                    </ToggleGroupItem>
-                                    <ToggleGroupItem
-                                      value="answer"
-                                      className="text-xs px-2 data-[state=on]:bg-[#ff3300] data-[state=on]:text-white"
-                                    >
-                                      Answer
-                                    </ToggleGroupItem>
-                                  </ToggleGroup>
-                                </div>
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setStep("dimensions")}
-                    className="border-[#ff3300]/20 text-[#ff3300] hover:bg-[#fff5f3] hover:text-[#e62e00]"
-                  >
-                    Back
-                  </Button>
-                  <Button onClick={generateJson} className="bg-[#ff3300] hover:bg-[#e62e00] text-white">
-                    Generate JSON
-                  </Button>
-                </div>
-              </div>
+              <TableGraphicOrganizer
+                columns={columns}
+                rows={rows}
+                tableData={tableData}
+                headerCells={headerCells}
+                answerCells={answerCells}
+                setTableData={setTableData}
+                setHeaderCells={setHeaderCells}
+                setAnswerCells={setAnswerCells}
+              />
             )}
 
             {formData.template_type === "Table" && step === "result" && (
