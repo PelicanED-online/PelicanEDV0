@@ -102,3 +102,19 @@ export interface SubReading {
   order?: number
   published?: string
 }
+
+export type ActivityType = {
+  id: string
+  activity_id: string
+  type:
+    | "reading"
+    | "source"
+    | "question"
+    | "graphic_organizer"
+    | "vocabulary"
+    | "in_text_source"
+    | "image"
+    | "reading_addon"
+    | "sub_reading"
+  order: number
+}

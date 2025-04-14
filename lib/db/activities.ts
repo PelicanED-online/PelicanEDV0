@@ -470,9 +470,6 @@ export async function fetchActivitiesOld(lessonId: string) {
         order: activityOrder, // Use the order from the database
       })
 
-      // Find the activity to get the published status
-      const activity = activities.find((a) => a.activity_id === activityId)
-
       detailsMap[typeId] = {
         activity_id: activityId,
         order: activityOrder, // Also store the order in the details
@@ -595,31 +592,23 @@ export async function saveActivities(
         }
       }
 
-      // Clean up any readings in the database that are no longer in our state
-      await cleanupDeletedItems(activity.activity_id, updatedTypes, activityTypeDetails)
-    }
+      // Clean up any sections in the database that are no longer in our state
+      const { data: allSections } = await supabase
+        .from("lp_sections")
+        .select("lp_sections_id")
+        .eq("lessone_plan_id", lessonId)
 
-    // Clean up any activities in the database that are no longer in our state
-    const { data: allActivities } = await supabase.from("activities").select("activity_id").eq("lesson_id", lessonId)
+      if (allSections) {
+        const currentSectionIds = updatedActivities.map((s) => s.activity_id)
+        const sectionsToDelete = allSections.filter((s) => !currentSectionIds.includes(s.lp_sections_id))
 
-    if (allActivities) {
-      const currentActivityIds = updatedActivities.map((a) => a.activity_id)
-      const activitiesToDelete = allActivities.filter((a) => !currentActivityIds.includes(a.activity_id))
+        for (const sectionToDelete of sectionsToDelete) {
+          // Delete all directions for this section first
+          await supabase.from("lp_directions").delete().eq("lp_sections_id", sectionToDelete.lp_sections_id)
 
-      for (const activityToDelete of activitiesToDelete) {
-        // Delete all associated content
-        await supabase.from("readings").delete().eq("activity_id", activityToDelete.activity_id)
-        await supabase.from("sources").delete().eq("activity_id", activityToDelete.activity_id)
-        await supabase.from("in_text_source").delete().eq("actvity_id", activityToDelete.activity_id)
-        await supabase.from("questions").delete().eq("activity_id", activityToDelete.activity_id)
-        await supabase.from("graphic_organizers").delete().eq("activity_id", activityToDelete.activity_id)
-        await supabase.from("vocabulary").delete().eq("activity_id", activityToDelete.activity_id)
-        await supabase.from("images").delete().eq("activity_id", activityToDelete.activity_id)
-        await supabase.from("readings_addon").delete().eq("activity_id", activityToDelete.activity_id)
-        await supabase.from("sub_readings").delete().eq("activity_id", activityToDelete.activity_id)
-
-        // Delete the activity itself
-        await supabase.from("activities").delete().eq("activity_id", activityToDelete.activity_id)
+          // Then delete the section
+          await supabase.from("lp_sections").delete().eq("lp_sections_id", sectionToDelete.lp_sections_id)
+        }
       }
     }
   } catch (error) {
@@ -818,7 +807,7 @@ async function saveInTextSource(activityType: ActivityType, details: any, activi
     // Insert as new in-text source
     const { error: insertInTextSourceError } = await supabase.from("in_text_source").insert({
       in_text_source_id: details.in_text_source_id,
-      actvity_id: activityId, // Note the typo in the column name
+      actvity_id: activityId, // Note the typo in the database column name
       source_title_ce: details.source_title_ce || null,
       source_title_ad: details.source_title_ad || null,
       source_intro: details.source_intro || null,

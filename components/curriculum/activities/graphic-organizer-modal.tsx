@@ -4,7 +4,14 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -454,6 +461,15 @@ export function GraphicOrganizerModal({
             </div>
           </form>
         </div>
+
+        <DialogFooter className="flex-shrink-0 pt-2 border-t">
+          <Button type="button" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSaveTable}>
+            Save Changes
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
