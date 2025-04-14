@@ -4,21 +4,15 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
-import { Plus, Trash2, Trash } from "lucide-react"
+import { Save } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { useRouter } from "next/navigation"
 
 interface ActivityType {
   id: string
@@ -53,6 +47,8 @@ interface TableRow {
 interface TableData {
   headers: string[]
   rows: TableRow[]
+  headerCells: { row: number; col: number }[]
+  answerCells: { row: number; col: number }[]
 }
 
 // Generate a random ID for new rows
@@ -65,6 +61,7 @@ export function GraphicOrganizerModal({
   initialData,
   onSave,
 }: GraphicOrganizerModalProps) {
+  const router = useRouter()
   const [formData, setFormData] = useState<GraphicOrganizer>({
     activity_id: "",
     template_type: "",
@@ -76,11 +73,19 @@ export function GraphicOrganizerModal({
   const [tableData, setTableData] = useState<TableData>({
     headers: ["", ""],
     rows: [{ id: generateId(), cells: ["", ""] }],
+    headerCells: [],
+    answerCells: [],
   })
 
   // Track header and answer cells
   const [headerCells, setHeaderCells] = useState<{ row: number; col: number }[]>([])
   const [answerCells, setAnswerCells] = useState<{ row: number; col: number }[]>([])
+
+  // Multi-step form state
+  const [step, setStep] = useState<"template" | "dimensions" | "data" | "result">("template")
+  const [columns, setColumns] = useState<number>(2)
+  const [rows, setRows] = useState<number>(1)
+  const [jsonResult, setJsonResult] = useState<string>("")
 
   useEffect(() => {
     if (activity && open) {
@@ -101,19 +106,27 @@ export function GraphicOrganizerModal({
           setTableData({
             headers: content.headers || ["", ""],
             rows: content.rows || [{ id: generateId(), cells: ["", ""] }],
+            headerCells: content.headerCells || [],
+            answerCells: content.answerCells || [],
           })
-          setHeaderCells(content.headerCells || [])
-          setAnswerCells(content.answerCells || [])
+          setColumns(content.headers?.length || 2)
+          setRows(content.rows?.length || 1)
+          setStep("result")
         } catch (error) {
           console.error("Error parsing table data:", error)
           // Reset to default if there's an error
           setTableData({
             headers: ["", ""],
             rows: [{ id: generateId(), cells: ["", ""] }],
+            headerCells: [],
+            answerCells: [],
           })
-          setHeaderCells([])
-          setAnswerCells([])
+          setColumns(2)
+          setRows(1)
+          setStep("dimensions")
         }
+      } else {
+        setStep("template")
       }
     }
   }, [activity, initialData, open])
@@ -131,9 +144,14 @@ export function GraphicOrganizerModal({
       setTableData({
         headers: ["", ""],
         rows: [{ id: generateId(), cells: ["", ""] }],
+        headerCells: [],
+        answerCells: [],
       })
-      setHeaderCells([])
-      setAnswerCells([])
+      setColumns(2)
+      setRows(1)
+      setStep("dimensions")
+    } else {
+      setStep("template")
     }
   }
 
@@ -144,56 +162,31 @@ export function GraphicOrganizerModal({
     }))
   }
 
-  // Table specific handlers
-  const handleHeaderChange = (index: number, value: string) => {
-    const newHeaders = [...tableData.headers]
-    newHeaders[index] = value
-    setTableData({ ...tableData, headers: newHeaders })
+  const handleDimensionsSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Initialize the table data with empty strings
+    const initialData: string[][] = Array(rows)
+      .fill(null)
+      .map(() => Array(columns).fill(""))
+
+    setTableData(initialData)
+    setHeaderCells([])
+    setAnswerCells([])
+    setStep("data")
   }
 
-  const handleCellChange = (rowIndex: number, cellIndex: number, value: string) => {
-    const newRows = [...tableData.rows]
-    newRows[rowIndex].cells[cellIndex] = value
+  const handleDataChange = (rowIndex: number, colIndex: number, value: string) => {
+    const newRows = tableData.rows.map((row, i) => {
+      if (i === rowIndex) {
+        return {
+          ...row,
+          cells: row.cells.map((cell, j) => (j === colIndex ? value : cell)),
+        }
+      }
+      return row
+    })
     setTableData({ ...tableData, rows: newRows })
-  }
-
-  const addColumn = () => {
-    const newHeaders = [...tableData.headers, ""]
-    const newRows = tableData.rows.map((row) => ({
-      ...row,
-      cells: [...row.cells, ""],
-    }))
-    setTableData({ headers: newHeaders, rows: newRows })
-  }
-
-  const removeColumn = (index: number) => {
-    if (tableData.headers.length <= 2) return // Minimum 2 columns
-
-    const newHeaders = tableData.headers.filter((_, i) => i !== index)
-    const newRows = tableData.rows.map((row) => ({
-      ...row,
-      cells: row.cells.filter((_, i) => i !== index),
-    }))
-    setTableData({ headers: newHeaders, rows: newRows })
-    setHeaderCells((prev) => prev.map((cell) => (cell.col > index ? { ...cell, col: cell.col - 1 } : cell)))
-    setAnswerCells((prev) => prev.map((cell) => (cell.col > index ? { ...cell, col: cell.col - 1 } : cell)))
-  }
-
-  const addRow = () => {
-    const newRow = {
-      id: generateId(),
-      cells: Array(tableData.headers.length).fill(""),
-    }
-    setTableData({ ...tableData, rows: [...tableData.rows, newRow] })
-  }
-
-  const removeRow = (id: string) => {
-    if (tableData.rows.length <= 1) return // Minimum 1 row
-
-    const newRows = tableData.rows.filter((row) => row.id !== id)
-    setTableData({ ...tableData, rows: newRows })
-    setHeaderCells((prev) => prev.filter((cell) => cell.row !== id))
-    setAnswerCells((prev) => prev.filter((cell) => cell.row !== id))
   }
 
   // Check if a cell is a header
@@ -227,9 +220,74 @@ export function GraphicOrganizerModal({
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const addColumn = () => {
+    const newHeaders = [...tableData.headers, ""]
+    const newRows = tableData.rows.map((row) => ({
+      ...row,
+      cells: [...row.cells, ""],
+    }))
+    setTableData({
+      headers: newHeaders,
+      rows: newRows,
+      headerCells: tableData.headerCells,
+      answerCells: tableData.answerCells,
+    })
+  }
 
+  const removeColumn = (index: number) => {
+    if (tableData.headers.length <= 2) return // Minimum 2 columns
+
+    const newHeaders = tableData.headers.filter((_, i) => i !== index)
+    const newRows = tableData.rows.map((row) => ({
+      ...row,
+      cells: row.cells.filter((_, i) => i !== index),
+    }))
+    setTableData({
+      headers: newHeaders,
+      rows: newRows,
+      headerCells: tableData.headerCells,
+      answerCells: tableData.answerCells,
+    })
+    setHeaderCells((prev) => prev.map((cell) => (cell.col > index ? { ...cell, col: cell.col - 1 } : cell)))
+    setAnswerCells((prev) => prev.map((cell) => (cell.col > index ? { ...cell, col: cell.col - 1 } : cell)))
+  }
+
+  const addRow = () => {
+    const newRow = {
+      id: generateId(),
+      cells: Array(tableData.headers.length).fill(""),
+    }
+    setTableData({ ...tableData, rows: [...tableData.rows, newRow] })
+  }
+
+  const removeRow = (id: string) => {
+    if (tableData.rows.length <= 1) return // Minimum 1 row
+
+    const newRows = tableData.rows.filter((row) => row.id !== id)
+    setTableData({ ...tableData, rows: newRows })
+    setHeaderCells((prev) => prev.filter((cell) => cell.row !== id))
+    setAnswerCells((prev) => prev.filter((cell) => cell.row !== id))
+  }
+
+  const generateJson = () => {
+    // Create a comprehensive JSON structure with metadata
+    const result: {
+      headers: string[]
+      rows: { id: string; cells: string[] }[]
+      headerCells: { row: number; col: number }[]
+      answerCells: { row: number; col: number }[]
+    } = {
+      headers: tableData.headers,
+      rows: tableData.rows,
+      headerCells: headerCells,
+      answerCells: answerCells,
+    }
+
+    setJsonResult(JSON.stringify(result, null, 2))
+    setStep("result")
+  }
+
+  const handleSaveTable = () => {
     // Prepare content based on template type
     let content = {}
 
@@ -245,6 +303,11 @@ export function GraphicOrganizerModal({
       ...formData,
       content,
     })
+    onOpenChange(false)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
   }
 
   return (
@@ -259,83 +322,77 @@ export function GraphicOrganizerModal({
 
         <div className="flex-1 overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="template_type" className="text-right">
-                Template Type
-              </Label>
-              <div className="col-span-3">
-                <Select value={formData.template_type} onValueChange={handleTemplateChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a template" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Table">Table</SelectItem>
-                  </SelectContent>
-                </Select>
+            {step === "template" && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="template_type" className="text-right">
+                  Template Type
+                </Label>
+                <div className="col-span-3">
+                  <Select value={formData.template_type} onValueChange={handleTemplateChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Table">Table</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
+            )}
 
-            {formData.template_type === "Table" && (
-              <div className="space-y-4 border p-4 rounded-md">
-                <h3 className="text-lg font-medium">Table Configuration</h3>
-
-                {/* Headers */}
-                <div className="flex items-center space-x-2">
-                  {tableData.headers.map((header, index) => (
-                    <div key={index} className="flex-1">
-                      <Label htmlFor={`header-${index}`}>Column {index + 1}</Label>
-                      <div className="flex items-center mt-1">
-                        <Input
-                          id={`header-${index}`}
-                          value={header}
-                          onChange={(e) => handleHeaderChange(index, e.target.value)}
-                          placeholder={`Column ${index + 1}`}
-                          className="flex-1"
-                        />
-                        {tableData.headers.length > 2 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeColumn(index)}
-                            className="ml-1"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <Button type="button" variant="outline" size="icon" onClick={addColumn} className="mt-6">
-                    <Plus className="h-4 w-4" />
+            {formData.template_type === "Table" && step === "dimensions" && (
+              <div className="space-y-6 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="columns">Number of Columns</Label>
+                    <Input
+                      id="columns"
+                      type="number"
+                      min="2"
+                      max="20"
+                      required
+                      value={columns || ""}
+                      onChange={(e) => setColumns(Number.parseInt(e.target.value) || 0)}
+                      placeholder="Enter number of columns"
+                      className="focus-visible:ring-[#ff3300]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rows">Number of Rows</Label>
+                    <Input
+                      id="rows"
+                      type="number"
+                      min="1"
+                      max="50"
+                      required
+                      value={rows || ""}
+                      onChange={(e) => setRows(Number.parseInt(e.target.value) || 0)}
+                      placeholder="Enter number of rows"
+                      className="focus-visible:ring-[#ff3300]"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep("template")}
+                    className="border-[#ff3300]/20 text-[#ff3300] hover:bg-[#fff5f3] hover:text-[#e62e00]"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleDimensionsSubmit}
+                    disabled={columns <= 1 || rows <= 0}
+                    className="bg-[#ff3300] hover:bg-[#e62e00] text-white"
+                  >
+                    Continue to Data Entry
                   </Button>
                 </div>
+              </div>
+            )}
 
-                {/* Rows */}
-                <div className="space-y-3">
-                  {tableData.rows.map((row, rowIndex) => (
-                    <div key={row.id} className="flex items-center space-x-2">
-                      {row.cells.map((cell, cellIndex) => (
-                        <div key={cellIndex} className="flex-1">
-                          <Input
-                            value={cell}
-                            onChange={(e) => handleCellChange(rowIndex, cellIndex, e.target.value)}
-                            placeholder={`Row ${rowIndex + 1}, Col ${cellIndex + 1}`}
-                          />
-                        </div>
-                      ))}
-                      {tableData.rows.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeRow(row.id)}>
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button type="button" variant="outline" onClick={addRow} className="w-full">
-                    <Plus className="h-4 w-4 mr-2" /> Add Row
-                  </Button>
-                </div>
-
+            {formData.template_type === "Table" && step === "data" && (
+              <div className="space-y-6 pt-4">
                 <div className="mb-4">
                   <p className="text-sm text-muted-foreground mb-2">For each cell, select its type:</p>
                   <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
@@ -350,13 +407,12 @@ export function GraphicOrganizerModal({
                     </li>
                   </ul>
                 </div>
-
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
                         <th className="p-2 border bg-gray-100 text-left w-24">Row/Col</th>
-                        {Array.from({ length: tableData.headers.length }).map((_, colIndex) => (
+                        {Array.from({ length: columns }).map((_, colIndex) => (
                           <th key={colIndex} className="p-2 border bg-gray-100 text-center">
                             <span>Col {colIndex + 1}</span>
                           </th>
@@ -365,7 +421,7 @@ export function GraphicOrganizerModal({
                     </thead>
                     <tbody>
                       {tableData.rows.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
+                        <tr key={row.id}>
                           <td className="p-2 border bg-gray-50">
                             <span>Row {rowIndex + 1}</span>
                           </td>
@@ -379,6 +435,22 @@ export function GraphicOrganizerModal({
                               )}
                             >
                               <div className="space-y-2">
+                                <Input
+                                  value={cell}
+                                  onChange={(e) => handleDataChange(rowIndex, colIndex, e.target.value)}
+                                  placeholder={
+                                    isCellHeader(rowIndex, colIndex)
+                                      ? "Header name"
+                                      : isCellAnswer(rowIndex, colIndex)
+                                        ? "Answer placeholder"
+                                        : "Value"
+                                  }
+                                  className={cn(
+                                    "focus-visible:ring-[#ff3300]",
+                                    isCellHeader(rowIndex, colIndex) && "font-medium",
+                                    isCellAnswer(rowIndex, colIndex) && "border-[#ff3300] bg-[#fff5f3]",
+                                  )}
+                                />
                                 <ToggleGroup
                                   type="single"
                                   size="sm"
@@ -409,6 +481,48 @@ export function GraphicOrganizerModal({
                     </tbody>
                   </table>
                 </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep("dimensions")}
+                    className="border-[#ff3300]/20 text-[#ff3300] hover:bg-[#fff5f3] hover:text-[#e62e00]"
+                  >
+                    Back
+                  </Button>
+                  <Button onClick={generateJson} className="bg-[#ff3300] hover:bg-[#e62e00] text-white">
+                    Generate JSON
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {formData.template_type === "Table" && step === "result" && (
+              <div className="space-y-6 pt-4">
+                <div className="p-4 border rounded-md border-[#ff3300]/20 bg-[#fff8f7] max-h-[400px] overflow-y-auto">
+                  <pre className="whitespace-pre-wrap break-all">{jsonResult}</pre>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep("data")}
+                    className="border-[#ff3300]/20 text-[#ff3300] hover:bg-[#fff5f3] hover:text-[#e62e00]"
+                  >
+                    Back to Data
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(jsonResult)
+                    }}
+                    variant="outline"
+                    className="border-[#ff3300]/20 text-[#ff3300] hover:bg-[#fff5f3] hover:text-[#e62e00]"
+                  >
+                    Copy to Clipboard
+                  </Button>
+                  <Button onClick={handleSaveTable} className="bg-[#ff3300] hover:bg-[#e62e00] text-white">
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Table
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -425,12 +539,6 @@ export function GraphicOrganizerModal({
             </div>
           </form>
         </div>
-
-        <DialogFooter className="flex-shrink-0 pt-2 border-t">
-          <Button type="submit" onClick={handleSubmit}>
-            Save Changes
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
