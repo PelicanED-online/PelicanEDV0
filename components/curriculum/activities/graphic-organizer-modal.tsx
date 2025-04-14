@@ -9,11 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
-import { Save } from "lucide-react"
 import { useRouter } from "next/navigation"
 import TableGraphicOrganizer from "./table-graphic-organizer"
-import { saveGraphicOrganizer } from "@/lib/save-graphic-organizer"
-import { useToast } from "@/components/ui/use-toast"
+import { Save } from "lucide-react"
 
 interface ActivityType {
   id: string
@@ -87,8 +85,6 @@ export function GraphicOrganizerModal({
   const [columns, setColumns] = useState<number>(1)
   const [rows, setRows] = useState<number>(1)
   const [jsonResult, setJsonResult] = useState<string>("")
-
-  const { toast } = useToast()
 
   useEffect(() => {
     if (activity && open) {
@@ -264,8 +260,6 @@ export function GraphicOrganizerModal({
   }
 
   const removeRow = (id: string) => {
-    if (tableData.rows.length <= 1) return // Minimum 1 row
-
     setTableData((prev) => ({
       ...prev,
       rows: prev.rows.filter((row) => row.id !== id),
@@ -274,20 +268,7 @@ export function GraphicOrganizerModal({
     setAnswerCells((prev) => prev.filter((cell) => cell.row !== id))
   }
 
-  const generateJson = () => {
-    const content = {
-      headers: tableData.headers,
-      rows: tableData.rows,
-      headerCells: headerCells,
-      answerCells: answerCells,
-    }
-    setJsonResult(JSON.stringify(content, null, 2))
-    setStep("result")
-  }
-
-  const handleSaveTable = async () => {
-    if (!activity) return
-
+  const handleSaveTable = () => {
     // Prepare content based on template type
     let content = {}
 
@@ -300,27 +281,22 @@ export function GraphicOrganizerModal({
       }
     }
 
-    const saveResult = await saveGraphicOrganizer({
-      activityId: activity.activity_id,
-      templateType: formData.template_type,
-      content: content,
-      order: activity.order,
-      published: formData.published || "No",
+    onSave({
+      ...formData,
+      content,
     })
+    onOpenChange(false)
+  }
 
-    if (saveResult.success) {
-      toast({
-        title: "Success",
-        description: "Graphic organizer saved successfully",
-      })
-      onOpenChange(false)
-    } else {
-      toast({
-        title: "Error",
-        description: saveResult.error || "Failed to save graphic organizer",
-        variant: "destructive",
-      })
+  const generateJson = () => {
+    const content = {
+      headers: tableData.headers,
+      rows: tableData.rows,
+      headerCells: headerCells,
+      answerCells: answerCells,
     }
+    setJsonResult(JSON.stringify(content, null, 2))
+    setStep("result")
   }
 
   const handleSubmit = (e: React.FormEvent) => {
