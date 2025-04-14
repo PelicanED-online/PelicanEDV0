@@ -9,10 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
-import { Save } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useRouter } from "next/navigation"
+import { Save } from "lucide-react"
 
 interface ActivityType {
   id: string
@@ -111,7 +111,7 @@ export function GraphicOrganizerModal({
           })
           setColumns(content.headers?.length || 2)
           setRows(content.rows?.length || 1)
-          setStep("result")
+          setStep("data")
         } catch (error) {
           console.error("Error parsing table data:", error)
           // Reset to default if there's an error
@@ -177,16 +177,18 @@ export function GraphicOrganizerModal({
   }
 
   const handleDataChange = (rowIndex: number, colIndex: number, value: string) => {
-    const newRows = tableData.rows.map((row, i) => {
-      if (i === rowIndex) {
-        return {
-          ...row,
-          cells: row.cells.map((cell, j) => (j === colIndex ? value : cell)),
-        }
-      }
-      return row
-    })
-    setTableData({ ...tableData, rows: newRows })
+    const newData = {
+      ...tableData,
+      rows: tableData.rows.map((row, i) =>
+        i === rowIndex
+          ? {
+              ...row,
+              cells: row.cells.map((cell, j) => (j === colIndex ? value : cell)),
+            }
+          : row,
+      ),
+    }
+    setTableData(newData)
   }
 
   // Check if a cell is a header
@@ -221,50 +223,43 @@ export function GraphicOrganizerModal({
   }
 
   const addColumn = () => {
-    const newHeaders = [...tableData.headers, ""]
-    const newRows = tableData.rows.map((row) => ({
-      ...row,
-      cells: [...row.cells, ""],
+    setTableData((prev) => ({
+      ...prev,
+      headers: [...prev.headers, ""],
+      rows: prev.rows.map((row) => ({
+        ...row,
+        cells: [...row.cells, ""],
+      })),
     }))
-    setTableData({
-      headers: newHeaders,
-      rows: newRows,
-      headerCells: tableData.headerCells,
-      answerCells: tableData.answerCells,
-    })
   }
 
   const removeColumn = (index: number) => {
     if (tableData.headers.length <= 2) return // Minimum 2 columns
 
-    const newHeaders = tableData.headers.filter((_, i) => i !== index)
-    const newRows = tableData.rows.map((row) => ({
-      ...row,
-      cells: row.cells.filter((_, i) => i !== index),
+    setTableData((prev) => ({
+      ...prev,
+      headers: prev.headers.filter((_, i) => i !== index),
+      rows: prev.rows.map((row) => ({
+        ...row,
+        cells: row.cells.filter((_, i) => i !== index),
+      })),
     }))
-    setTableData({
-      headers: newHeaders,
-      rows: newRows,
-      headerCells: tableData.headerCells,
-      answerCells: tableData.answerCells,
-    })
     setHeaderCells((prev) => prev.map((cell) => (cell.col > index ? { ...cell, col: cell.col - 1 } : cell)))
     setAnswerCells((prev) => prev.map((cell) => (cell.col > index ? { ...cell, col: cell.col - 1 } : cell)))
   }
 
   const addRow = () => {
-    const newRow = {
-      id: generateId(),
-      cells: Array(tableData.headers.length).fill(""),
-    }
-    setTableData({ ...tableData, rows: [...tableData.rows, newRow] })
+    setTableData((prev) => ({
+      ...prev,
+      rows: [...prev.rows, { id: generateId(), cells: Array(prev.headers.length).fill("") }],
+    }))
   }
 
   const removeRow = (id: string) => {
-    if (tableData.rows.length <= 1) return // Minimum 1 row
-
-    const newRows = tableData.rows.filter((row) => row.id !== id)
-    setTableData({ ...tableData, rows: newRows })
+    setTableData((prev) => ({
+      ...prev,
+      rows: prev.rows.filter((row) => row.id !== id),
+    }))
     setHeaderCells((prev) => prev.filter((cell) => cell.row !== id))
     setAnswerCells((prev) => prev.filter((cell) => cell.row !== id))
   }
@@ -293,9 +288,10 @@ export function GraphicOrganizerModal({
 
     if (formData.template_type === "Table") {
       content = {
-        ...tableData,
-        headerCells,
-        answerCells,
+        headers: tableData.headers,
+        rows: tableData.rows,
+        headerCells: headerCells,
+        answerCells: answerCells,
       }
     }
 
@@ -304,6 +300,7 @@ export function GraphicOrganizerModal({
       content,
     })
     onOpenChange(false)
+    router.back()
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -425,57 +422,59 @@ export function GraphicOrganizerModal({
                           <td className="p-2 border bg-gray-50">
                             <span>Row {rowIndex + 1}</span>
                           </td>
-                          {row.cells.map((cell, colIndex) => (
-                            <td
-                              key={colIndex}
-                              className={cn(
-                                "p-2 border",
-                                isCellHeader(rowIndex, colIndex) && "bg-blue-100",
-                                isCellAnswer(rowIndex, colIndex) && "bg-[#fff0ee]",
-                              )}
-                            >
-                              <div className="space-y-2">
-                                <Input
-                                  value={cell}
-                                  onChange={(e) => handleDataChange(rowIndex, colIndex, e.target.value)}
-                                  placeholder={
-                                    isCellHeader(rowIndex, colIndex)
-                                      ? "Header name"
-                                      : isCellAnswer(rowIndex, colIndex)
-                                        ? "Answer placeholder"
-                                        : "Value"
-                                  }
-                                  className={cn(
-                                    "focus-visible:ring-[#ff3300]",
-                                    isCellHeader(rowIndex, colIndex) && "font-medium",
-                                    isCellAnswer(rowIndex, colIndex) && "border-[#ff3300] bg-[#fff5f3]",
-                                  )}
-                                />
-                                <ToggleGroup
-                                  type="single"
-                                  size="sm"
-                                  value={getCellType(rowIndex, colIndex)}
-                                  onValueChange={(value) => {
-                                    if (value) setCellType(rowIndex, colIndex, value)
-                                  }}
-                                  className="justify-center"
-                                >
-                                  <ToggleGroupItem value="normal" className="text-xs px-2">
-                                    Normal
-                                  </ToggleGroupItem>
-                                  <ToggleGroupItem value="header" className="text-xs px-2">
-                                    Header
-                                  </ToggleGroupItem>
-                                  <ToggleGroupItem
-                                    value="answer"
-                                    className="text-xs px-2 data-[state=on]:bg-[#ff3300] data-[state=on]:text-white"
+                          {row.cells.map((cell, cellIndex) => {
+                            return (
+                              <td
+                                key={cellIndex}
+                                className={cn(
+                                  "p-2 border",
+                                  isCellHeader(rowIndex, cellIndex) && "bg-blue-100",
+                                  isCellAnswer(rowIndex, cellIndex) && "bg-[#fff0ee]",
+                                )}
+                              >
+                                <div className="space-y-2">
+                                  <Input
+                                    value={cell}
+                                    onChange={(e) => handleDataChange(rowIndex, cellIndex, e.target.value)}
+                                    placeholder={
+                                      isCellHeader(rowIndex, cellIndex)
+                                        ? "Header name"
+                                        : isCellAnswer(rowIndex, cellIndex)
+                                          ? "Answer placeholder"
+                                          : "Value"
+                                    }
+                                    className={cn(
+                                      "focus-visible:ring-[#ff3300]",
+                                      isCellHeader(rowIndex, cellIndex) && "font-medium",
+                                      isCellAnswer(rowIndex, cellIndex) && "border-[#ff3300] bg-[#fff5f3]",
+                                    )}
+                                  />
+                                  <ToggleGroup
+                                    type="single"
+                                    size="sm"
+                                    value={getCellType(rowIndex, cellIndex)}
+                                    onValueChange={(value) => {
+                                      if (value) setCellType(rowIndex, cellIndex, value)
+                                    }}
+                                    className="justify-center"
                                   >
-                                    Answer
-                                  </ToggleGroupItem>
-                                </ToggleGroup>
-                              </div>
-                            </td>
-                          ))}
+                                    <ToggleGroupItem value="normal" className="text-xs px-2">
+                                      Normal
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem value="header" className="text-xs px-2">
+                                      Header
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem
+                                      value="answer"
+                                      className="text-xs px-2 data-[state=on]:bg-[#ff3300] data-[state=on]:text-white"
+                                    >
+                                      Answer
+                                    </ToggleGroupItem>
+                                  </ToggleGroup>
+                                </div>
+                              </td>
+                            )
+                          })}
                         </tr>
                       ))}
                     </tbody>
