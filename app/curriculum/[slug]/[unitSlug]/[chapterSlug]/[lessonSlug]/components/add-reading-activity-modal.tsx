@@ -70,4 +70,3 @@ export function AddReadingActivityModal({ onSubmit, trigger }: AddReadingActivit
     </AlertDialog>
   )
 }
-

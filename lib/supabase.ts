@@ -124,4 +124,3 @@ export async function signOut() {
 }
 
 export const createClient = supabaseCreateClient
-

@@ -40,4 +40,3 @@ export async function verifyInvitationJwt(token: string): Promise<InvitationJwtP
     return null
   }
 }
-

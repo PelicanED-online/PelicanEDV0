@@ -228,4 +228,3 @@ export default function CurriculumViewPage() {
     </DashboardLayout>
   )
 }
-

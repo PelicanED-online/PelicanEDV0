@@ -87,4 +87,3 @@ export function AddInTextSourceModal({ onSubmit, trigger }: AddInTextSourceModal
     </AlertDialog>
   )
 }
-

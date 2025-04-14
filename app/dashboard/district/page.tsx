@@ -203,4 +203,3 @@ export default function DistrictDashboard() {
     </DashboardLayout>
   )
 }
-

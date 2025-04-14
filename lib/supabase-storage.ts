@@ -60,4 +60,3 @@ export async function deleteFromSupabaseStorage(url: string): Promise<void> {
     throw new Error("Failed to delete file")
   }
 }
-

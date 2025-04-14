@@ -50,6 +50,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { ReadingAddonModal } from "@/components/curriculum/activities/reading-addon-modal"
+import QuestionChoicesSaver from "@/components/curriculum/activities/question-choices-saver" // Import the new component
 
 interface Subject {
   subject_id: string
@@ -159,8 +160,9 @@ interface Question {
     question_choices_id?: string
     choice_text: string
     is_correct: boolean
-    order?: number
+    order: number
   }[]
+  partB?: string
 }
 
 interface GraphicOrganizer {
@@ -313,6 +315,36 @@ export default function ActivitiesPage() {
         .in("activity_id", activitiesData.map((a) => a.activity_id) || [])
 
       if (questionsError) throw questionsError
+
+      // Fetch Part B content for Part A Part B questions
+      const partAQuestionIds = questionsData
+        .filter((q) => q.question_type === "Part A Part B Question")
+        .map((q) => q.question_id)
+
+      let partBData: any[] = []
+      if (partAQuestionIds.length > 0) {
+        const { data: fetchedPartBData, error: partBError } = await supabase
+          .from("questions_partb")
+          .select("*")
+          .in("part_a_id", partAQuestionIds)
+
+        if (partBError) throw partBError
+        partBData = fetchedPartBData || []
+      }
+
+      // Fetch question choices for multiple choice and multiple select questions
+      const { data: questionChoicesData, error: questionChoicesError } = await supabase
+        .from("question_choices")
+        .select("*")
+        .in(
+          "question_id",
+          questionsData
+            .filter((q) => q.question_type === "Multiple Choice" || q.question_type === "Multiple Select")
+            .map((q) => q.question_id) || [],
+        )
+        .order("order", { ascending: true })
+
+      if (questionChoicesError) throw questionChoicesError
 
       // Fetch graphic organizers
       const { data: organizersData, error: organizersError } = await supabase
@@ -488,9 +520,33 @@ export default function ActivitiesPage() {
           order: question.order !== undefined ? question.order : typesMap[activityId].length,
         })
 
-        // Include question_id in the details
+        // Find answer options for this question
+        const answerOptions = questionChoicesData
+          ? questionChoicesData
+              .filter((choice) => choice.question_id === question.question_id)
+              .map((choice) => ({
+                question_choices_id: choice.question_choices_id,
+                choice_text: choice.choice_text || "",
+                is_correct: choice.is_correct || false,
+                order: choice.order || 0,
+              }))
+              .sort((a, b) => a.order - b.order)
+          : []
+
+        // Find Part B content if this is a Part A Part B question
+        let partB = null
+        if (question.question_type === "Part A Part B Question") {
+          const partBRecord = partBData.find((pb) => pb.part_a_id === question.question_id)
+          if (partBRecord) {
+            partB = partBRecord.question_text
+          }
+        }
+
+        // Include question_id, answer options, and Part B content in the details
         detailsMap[typeId] = {
           ...question,
+          answerOptions,
+          partB, // Add Part B content
         }
       }
 
@@ -1122,6 +1178,9 @@ export default function ActivitiesPage() {
   const handleSaveQuestion = async (question: Question) => {
     if (!currentActivityType) return
 
+    console.log("Saving question:", question)
+    console.log("Current activity type:", currentActivityType)
+
     // Check if we're editing an existing activity type or adding a new one
     const isEditing = activityTypes[currentActivityType.activity_id]?.some((type) => type.id === currentActivityType.id)
 
@@ -1598,49 +1657,14 @@ export default function ActivitiesPage() {
   }
 
   // Modify the handleDeleteQuestion function
-  const handleDeleteQuestion = async (questionId: string) => {
-    if (!confirm("Are you sure you want to delete this question? This action cannot be undone.")) {
-      return
-    }
+  // Remove the handleEditQuestion function
+  // Remove handleEditQuestion
 
-    setSaving(true)
+  // Remove the handleDeleteQuestion function
+  // Remove handleDeleteQuestion
 
-    try {
-      // 1. Delete associated question choices
-      const { error: deleteChoicesError } = await supabase
-        .from("question_choices")
-        .delete()
-        .eq("question_id", questionId)
-
-      if (deleteChoicesError) {
-        throw deleteChoicesError
-      }
-
-      // 2. Delete the question
-      const { error } = await supabase.from("questions").delete().eq("question_id", questionId)
-
-      if (error) {
-        throw error
-      }
-
-      toast({
-        title: "Success",
-        description: "Question deleted successfully!",
-      })
-
-      // Refresh the data
-      fetchActivities(lesson?.lesson_id || "")
-    } catch (error: any) {
-      console.error("Error deleting question:", error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete question",
-        variant: "destructive",
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
+  // Remove the confirmDeleteQuestion function
+  // Remove confirmDeleteQuestion
 
   const handleSaveLesson = async () => {
     if (!lesson) return
@@ -2049,56 +2073,53 @@ export default function ActivitiesPage() {
                 }
                 console.log("Question updated successfully:", updateResult)
 
-                // Find the section in handleSaveLesson where we handle multiple choice questions
-                // Replace the code that handles question choices with this updated version:
+                // If this is a Part A Part B Question, update or create the Part B record
+                if (questionDetails.question_type === "Part A Part B Question") {
+                  // Check if a Part B record already exists
+                  const { data: existingPartB } = await supabase
+                    .from("questions_partb")
+                    .select("*")
+                    .eq("part_a_id", questionDetails.question_id)
+                    .single()
 
-                // Handle multiple choice options if this is a multiple choice question
-                if (questionDetails.question_type === "Multiple Choice" && questionDetails.answerOptions) {
-                  console.log("Processing multiple choice options for question:", questionDetails.question_id)
-                  console.log("Answer options with order:", JSON.stringify(questionDetails.answerOptions, null, 2))
+                  if (existingPartB) {
+                    // Update existing Part B
+                    const { error: updatePartBError } = await supabase
+                      .from("questions_partb")
+                      .update({
+                        question_text: questionDetails.partB || null,
+                      })
+                      .eq("part_a_id", questionDetails.question_id)
 
-                  // First, delete existing choices for this question
-                  const { error: deleteChoicesError } = await supabase
-                    .from("question_choices")
-                    .delete()
-                    .eq("question_id", questionDetails.question_id)
-
-                  if (deleteChoicesError) {
-                    console.error("Error deleting existing question choices:", deleteChoicesError)
-                    throw deleteChoicesError
-                  }
-
-                  // Then insert new choices with order explicitly included
-                  const choicesData = questionDetails.answerOptions.map((option) => {
-                    // Ensure order is a number
-                    const orderValue =
-                      typeof option.order === "number" ? option.order : Number.parseInt(String(option.order), 10) || 0
-
-                    return {
-                      question_id: questionDetails.question_id,
-                      choice_text: option.choice_text,
-                      is_correct: option.is_correct,
-                      order: orderValue, // Explicitly include order as a number
+                    if (updatePartBError) {
+                      console.error("Error updating Part B:", updatePartBError)
+                      throw updatePartBError
                     }
-                  })
+                  } else {
+                    // Create new Part B record
+                    const { error: insertPartBError } = await supabase.from("questions_partb").insert({
+                      part_a_id: questionDetails.question_id,
+                      question_text: questionDetails.partB || null,
+                    })
 
-                  console.log(
-                    "Inserting question choices with explicit order values:",
-                    JSON.stringify(choicesData, null, 2),
-                  )
-
-                  // Use upsert instead of insert to handle any potential conflicts
-                  const { data: insertedChoices, error: insertChoicesError } = await supabase
-                    .from("question_choices")
-                    .upsert(choicesData)
-                    .select()
-
-                  if (insertChoicesError) {
-                    console.error("Error inserting question choices:", insertChoicesError)
-                    throw insertChoicesError
+                    if (insertPartBError) {
+                      console.error("Error inserting Part B:", insertPartBError)
+                      throw insertPartBError
+                    }
                   }
+                }
 
-                  console.log("Question choices saved successfully:", insertedChoices)
+                // Call the new component to save the question choices
+                if (questionDetails.answerOptions) {
+                  try {
+                    await QuestionChoicesSaver({
+                      questionId: questionDetails.question_id,
+                      answerOptions: questionDetails.answerOptions,
+                    })
+                  } catch (error) {
+                    console.error("Error saving question choices:", error)
+                    // Handle the error appropriately, e.g., by setting an error state
+                  }
                 }
               } else {
                 // Insert as new question
@@ -2136,22 +2157,30 @@ export default function ActivitiesPage() {
                 }
                 console.log("Question inserted successfully:", insertResult)
 
-                // Handle multiple choice options if this is a multiple choice question
-                if (questionDetails.question_type === "Multiple Choice" && questionDetails.answerOptions) {
-                  const choicesData = questionDetails.answerOptions.map((option) => ({
-                    question_id: questionDetails.question_id,
-                    choice_text: option.choice_text,
-                    is_correct: option.is_correct,
-                  }))
+                // If this is a Part A Part B Question, create the Part B record
+                if (questionDetails.question_type === "Part A Part B Question") {
+                  const { error: insertPartBError } = await supabase.from("questions_partb").insert({
+                    part_a_id: questionDetails.question_id,
+                    question_text: questionDetails.partB || null,
+                  })
 
-                  const { error: insertChoicesError } = await supabase.from("question_choices").insert(choicesData)
-
-                  if (insertChoicesError) {
-                    console.error("Error inserting question choices:", insertChoicesError)
-                    throw insertChoicesError
+                  if (insertPartBError) {
+                    console.error("Error inserting Part B:", insertPartBError)
+                    throw insertPartBError
                   }
+                }
 
-                  console.log("Question choices saved successfully")
+                // Call the new component to save the question choices
+                if (questionDetails.answerOptions) {
+                  try {
+                    await QuestionChoicesSaver({
+                      questionId: questionDetails.question_id,
+                      answerOptions: questionDetails.answerOptions,
+                    })
+                  } catch (error) {
+                    console.error("Error saving question choices:", error)
+                    // Handle the error appropriately, e.g., by setting an error state
+                  }
                 }
               }
               break
@@ -2257,8 +2286,7 @@ export default function ActivitiesPage() {
                   description_title: imageDetails.description_title || null,
                   description: imageDetails.description || null,
                   alt: imageDetails.alt || null,
-                  position: imageDetails.position || "center",
-                  order: activityType.order,
+                  position: activityType.order,
                   published: imageDetails.published || "No",
                 })
 
@@ -2374,7 +2402,7 @@ export default function ActivitiesPage() {
         // Clean up any questions in the database that are no longer in our state
         const { data: existingQuestions } = await supabase
           .from("questions")
-          .select("question_id, activity_id")
+          .select("question_id")
           .eq("activity_id", activity.activity_id)
 
         if (existingQuestions && existingQuestions.length > 0) {
@@ -2400,7 +2428,7 @@ export default function ActivitiesPage() {
         // Clean up any graphic organizers in the database that are no longer in our state
         const { data: existingOrganizers } = await supabase
           .from("graphic_organizers")
-          .select("go_id, activity_id")
+          .select("go_id")
           .eq("activity_id", activity.activity_id)
 
         if (existingOrganizers && existingOrganizers.length > 0) {
@@ -2426,7 +2454,7 @@ export default function ActivitiesPage() {
         // Clean up any images in the database that are no longer in our state
         const { data: existingImages } = await supabase
           .from("images")
-          .select("image_id, activity_id")
+          .select("image_id")
           .eq("activity_id", activity.activity_id)
 
         if (existingImages && existingImages.length > 0) {
@@ -2450,7 +2478,7 @@ export default function ActivitiesPage() {
         // Clean up any sub-readings in the database that are no longer in our state
         const { data: existingSubReadings } = await supabase
           .from("sub_readings")
-          .select("reading_id, activity_id")
+          .select("reading_id")
           .eq("activity_id", activity.activity_id)
 
         if (existingSubReadings && existingSubReadings.length > 0) {
@@ -3229,4 +3257,3 @@ export default function ActivitiesPage() {
     </DashboardLayout>
   )
 }
-

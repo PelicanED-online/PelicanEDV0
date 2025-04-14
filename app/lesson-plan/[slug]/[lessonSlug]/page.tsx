@@ -1787,4 +1787,3 @@ export default function LessonPlanSectionsPage() {
     </DashboardLayout>
   )
 }
-

@@ -166,4 +166,3 @@ export async function registerUser({
     return { error: error.message || "An unexpected error occurred" }
   }
 }
-

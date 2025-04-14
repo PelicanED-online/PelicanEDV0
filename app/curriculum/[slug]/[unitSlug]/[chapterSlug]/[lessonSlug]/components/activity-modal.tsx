@@ -449,4 +449,3 @@ export function ActivityModal({ isOpen, onClose, activityType, onSave, activity,
     </div>
   )
 }
-

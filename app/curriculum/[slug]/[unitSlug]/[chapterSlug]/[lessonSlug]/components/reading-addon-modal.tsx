@@ -78,4 +78,3 @@ export function ReadingAddonModal({ onSubmit, initialTitle = "", initialContent 
     </AlertDialog>
   )
 }
-
