@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
+import { Save } from "lucide-react"
 import { useRouter } from "next/navigation"
 import TableGraphicOrganizer from "./table-graphic-organizer"
-import { Save } from "lucide-react"
 
 interface ActivityType {
   id: string
@@ -260,8 +260,6 @@ export function GraphicOrganizerModal({
   }
 
   const removeRow = (id: string) => {
-    if (tableData.rows.length <= 1) return // Minimum 1 row
-
     setTableData((prev) => ({
       ...prev,
       rows: prev.rows.filter((row) => row.id !== id),
@@ -291,60 +289,19 @@ export function GraphicOrganizerModal({
     router.back()
   }
 
-  const generateJson = () => {
-    // Prepare data for JSON conversion
-    const headers = tableData.headers
-    const rows = tableData.rows
-
-    // Find the header and answer cells
-    const headerCells = tableData.headerCells
-    const answerCells = tableData.answerCells
-
-    // Convert table data to JSON format
-    const jsonData = rows.map((row) => {
-      const rowData: { [key: string]: string } = {}
-
-      row.cells.forEach((cell, index) => {
-        const headerCell = headerCells.find((h) => h.col === index)
-        const answerCell = answerCells.find((a) => a.col === index)
-
-        if (headerCell) {
-          // If it's a header cell, use its value as the key
-          rowData[cell] = "" // Initialize with an empty string
-        }
-      })
-
-      row.cells.forEach((cell, index) => {
-        const headerCell = headerCells.find((h) => h.col === index)
-        const answerCell = answerCells.find((a) => a.col === index)
-
-        if (headerCell) {
-          // If it's a header cell, use its value as the key
-          const headerValue = cell
-          const answerColIndex = index
-
-          // Find the corresponding answer cell in the same row
-          const answerCellInRow = answerCells.find((a) => a.row === rows.indexOf(row) && a.col === answerColIndex)
-
-          if (answerCellInRow) {
-            rowData[headerValue] = cell // Assign the value to the corresponding header
-          }
-        }
-      })
-
-      return rowData
-    })
-
-    // Convert JSON data to a formatted string
-    const jsonString = JSON.stringify(jsonData, null, 2)
-    setJsonResult(jsonString)
-    setStep("result")
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission logic here
-    console.log("Form submitted")
+  }
+
+  const generateJson = () => {
+    const content = {
+      headers: tableData.headers,
+      rows: tableData.rows,
+      headerCells: headerCells,
+      answerCells: answerCells,
+    }
+    setJsonResult(JSON.stringify(content, null, 2))
+    setStep("result")
   }
 
   return (
@@ -429,16 +386,30 @@ export function GraphicOrganizerModal({
             )}
 
             {formData.template_type === "Table" && step === "data" && (
-              <TableGraphicOrganizer
-                columns={columns}
-                rows={rows}
-                tableData={tableData}
-                headerCells={headerCells}
-                answerCells={answerCells}
-                setTableData={setTableData}
-                setHeaderCells={setHeaderCells}
-                setAnswerCells={setAnswerCells}
-              />
+              <>
+                <TableGraphicOrganizer
+                  columns={columns}
+                  rows={rows}
+                  tableData={tableData}
+                  headerCells={headerCells}
+                  answerCells={answerCells}
+                  setTableData={setTableData}
+                  setHeaderCells={setHeaderCells}
+                  setAnswerCells={setAnswerCells}
+                />
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep("dimensions")}
+                    className="border-[#ff3300]/20 text-[#ff3300] hover:bg-[#fff5f3] hover:text-[#e62e00]"
+                  >
+                    Back
+                  </Button>
+                  <Button onClick={generateJson} className="bg-[#ff3300] hover:bg-[#e62e00] text-white">
+                    Generate JSON
+                  </Button>
+                </div>
+              </>
             )}
 
             {formData.template_type === "Table" && step === "result" && (
