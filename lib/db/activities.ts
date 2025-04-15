@@ -965,13 +965,8 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
   } else {
     // Insert as new graphic organizer
     console.log("Inserting new graphic organizer:", details)
-    // Ensure we have a valid UUID before inserting
-    if (!details.go_id || details.go_id === "") {
-      details.go_id = uuidv4()
-    }
 
     const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
-      go_id: details.go_id,
       activity_id: activityId,
       template_type: details.template_type || null,
       content: details.content || null,
