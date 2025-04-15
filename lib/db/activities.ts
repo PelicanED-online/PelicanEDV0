@@ -583,6 +583,7 @@ export async function saveActivities(
             break
           case "graphic_organizer":
             console.log("Saving graphic organizer:", activityType, details, activity.activity_id)
+            console.log("Details being saved:", details)
             await saveGraphicOrganizer(activityType, details, activity.activity_id)
             break
           case "vocabulary":
@@ -880,15 +881,11 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
 
     // Save question choices
     if (details.answerOptions && details.answerOptions.length > 0) {
-      // First delete existing choices
-      await supabase.from("question_choices").delete().eq("question_id", details.question_id)
-
-      // Then insert new choices
       const choicesToInsert = details.answerOptions.map((option, index) => ({
         question_choices_id: option.question_choices_id || uuidv4(),
         question_id: details.question_id,
         choice_text: option.choice_text,
-        is_correct: option.is_correct,
+        is_correct: option.isCorrect,
         order: index,
       }))
 
@@ -931,7 +928,7 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
         question_choices_id: option.question_choices_id || uuidv4(),
         question_id: details.question_id,
         choice_text: option.choice_text,
-        is_correct: option.is_correct,
+        is_correct: option.isCorrect,
         order: index,
       }))
 
@@ -942,7 +939,8 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
 }
 
 async function saveGraphicOrganizer(activityType: ActivityType, details: any, activityId: string) {
-  console.log("Saving graphic organizer:", activityType, details, activityId)
+  console.log("saveGraphicOrganizer called with:", { activityType, details, activityId })
+
   // Check if this is an update or a new graphic organizer
   const { data: existingOrganizer } = await supabase
     .from("graphic_organizers")
@@ -952,6 +950,7 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
 
   if (existingOrganizer) {
     // Update existing graphic organizer
+    console.log("Updating existing graphic organizer with go_id:", details.go_id)
     const { error: updateOrganizerError } = await supabase
       .from("graphic_organizers")
       .update({
@@ -969,8 +968,10 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
   } else {
     // Insert as new graphic organizer
     console.log("Inserting new graphic organizer:", details)
+    const go_id = details.go_id || uuidv4()
+    console.log("Generated go_id:", go_id)
     const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
-      go_id: details.go_id,
+      go_id: go_id,
       activity_id: activityId,
       template_type: details.template_type || null,
       content: details.content || null,
