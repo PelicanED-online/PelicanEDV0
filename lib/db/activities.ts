@@ -959,7 +959,10 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
       })
       .eq("go_id", details.go_id)
 
-    if (updateOrganizerError) throw updateOrganizerError
+    if (updateOrganizerError) {
+      console.error("Error updating graphic organizer:", updateOrganizerError)
+      throw updateOrganizerError
+    }
   } else {
     // Insert as new graphic organizer
     const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
@@ -971,7 +974,10 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
       published: details.published || "No",
     })
 
-    if (insertOrganizerError) throw insertOrganizerError
+    if (insertOrganizerError) {
+      console.error("Error inserting graphic organizer:", insertOrganizerError)
+      throw insertOrganizerError
+    }
   }
 }
 
