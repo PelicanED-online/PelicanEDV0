@@ -500,7 +500,7 @@ export async function fetchActivitiesOld(lessonId: string) {
   }
 }
 
-export async function saveActivities(
+async function saveActivities(
   lessonId: string,
   activities: Activity[],
   activityTypes: Record<string, ActivityType[]>,
@@ -583,7 +583,6 @@ export async function saveActivities(
             break
           case "graphic_organizer":
             console.log("Saving graphic organizer:", activityType, details, activity.activity_id)
-            console.log("Details being saved:", details)
             await saveGraphicOrganizer(activityType, details, activity.activity_id)
             break
           case "vocabulary":
@@ -939,8 +938,7 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
 }
 
 async function saveGraphicOrganizer(activityType: ActivityType, details: any, activityId: string) {
-  console.log("saveGraphicOrganizer called with:", { activityType, details, activityId })
-
+  console.log("Saving graphic organizer:", activityType, details, activityId)
   // Check if this is an update or a new graphic organizer
   const { data: existingOrganizer } = await supabase
     .from("graphic_organizers")
@@ -950,7 +948,6 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
 
   if (existingOrganizer) {
     // Update existing graphic organizer
-    console.log("Updating existing graphic organizer with go_id:", details.go_id)
     const { error: updateOrganizerError } = await supabase
       .from("graphic_organizers")
       .update({
@@ -968,10 +965,13 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
   } else {
     // Insert as new graphic organizer
     console.log("Inserting new graphic organizer:", details)
-    const go_id = details.go_id || uuidv4()
-    console.log("Generated go_id:", go_id)
+    // Ensure we have a valid UUID before inserting
+    if (!details.go_id || details.go_id === "") {
+      details.go_id = uuidv4()
+    }
+
     const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
-      go_id: go_id,
+      go_id: details.go_id,
       activity_id: activityId,
       template_type: details.template_type || null,
       content: details.content || null,
