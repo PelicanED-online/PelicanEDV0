@@ -938,7 +938,6 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
 }
 
 async function saveGraphicOrganizer(activityType: ActivityType, details: any, activityId: string) {
-  console.log("Saving graphic organizer:", activityType, details, activityId)
   // Check if this is an update or a new graphic organizer
   const { data: existingOrganizer } = await supabase
     .from("graphic_organizers")
@@ -948,35 +947,68 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
 
   if (existingOrganizer) {
     // Update existing graphic organizer
+    const publishedValue = details.published === "Yes" ? "Yes" : "No" // Ensure published value is valid
+    const contentValue = details.content
     const { error: updateOrganizerError } = await supabase
       .from("graphic_organizers")
       .update({
         template_type: details.template_type || null,
-        content: details.content || null,
+        content: contentValue,
         order: activityType.order,
-        published: details.published || "No",
+        published: publishedValue,
       })
       .eq("go_id", details.go_id)
 
     if (updateOrganizerError) {
       console.error("Error updating graphic organizer:", updateOrganizerError)
-      throw updateOrganizerError
+      console.error("Attempted to update with values:", {
+        go_id: details.go_id,
+        activity_id: activityId,
+        template_type: details.template_type || null,
+        content: contentValue,
+        order: activityType.order,
+        published: publishedValue,
+      })
+      return null
     }
   } else {
     // Insert as new graphic organizer
-    console.log("Inserting new graphic organizer:", details)
+    const publishedValue = details.published === "Yes" ? "Yes" : "No" // Ensure published value is valid
+    let contentValue = null
+    if (details.content) {
+      try {
+        // If it's a string, parse it to make sure it's valid JSON
+        if (typeof details.content === "string") {
+          contentValue = JSON.parse(details.content)
+        } else {
+          // If it's already an object, it should be fine
+          contentValue = details.content
+        }
+      } catch (e) {
+        console.error("Invalid JSON in content field:", e)
+        return null
+      }
+    }
 
     const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
       activity_id: activityId,
       template_type: details.template_type || null,
-      content: details.content || null,
+      content: contentValue,
       order: activityType.order,
-      published: details.published || "No",
+      published: publishedValue,
     })
 
     if (insertOrganizerError) {
       console.error("Error inserting graphic organizer:", insertOrganizerError)
-      throw insertOrganizerError
+      console.error("Attempted to insert with values:", {
+        go_id: details.go_id,
+        activity_id: activityId,
+        template_type: details.template_type || null,
+        content: contentValue,
+        order: activityType.order,
+        published: publishedValue,
+      })
+      return null
     }
   }
 }
