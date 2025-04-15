@@ -202,3 +202,4 @@ export function EditCurriculumModal({ subject, onCurriculumUpdated }: EditCurric
     </Dialog>
   )
 }
+

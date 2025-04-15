@@ -51,3 +51,4 @@ export async function getSchoolsByDistrict(districtId: string) {
     }
   }
 }
+

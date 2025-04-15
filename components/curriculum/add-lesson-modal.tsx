@@ -109,3 +109,4 @@ export function AddLessonModal({ chapterId, subjectId, onLessonAdded }: AddLesso
     </Dialog>
   )
 }
+

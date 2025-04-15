@@ -219,3 +219,4 @@ export function ImageActivityModal({ isOpen, onClose, onSave, image }: ImageActi
     </div>
   )
 }
+

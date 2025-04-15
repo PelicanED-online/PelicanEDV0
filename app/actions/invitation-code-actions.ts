@@ -217,3 +217,4 @@ export async function getDistrictDomains(districtId: string) {
     }
   }
 }
+

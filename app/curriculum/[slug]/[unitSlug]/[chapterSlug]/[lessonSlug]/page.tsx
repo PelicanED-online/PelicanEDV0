@@ -162,7 +162,6 @@ interface Question {
     is_correct: boolean
     order: number
   }[]
-  partB?: string
 }
 
 interface GraphicOrganizer {
@@ -315,22 +314,6 @@ export default function ActivitiesPage() {
         .in("activity_id", activitiesData.map((a) => a.activity_id) || [])
 
       if (questionsError) throw questionsError
-
-      // Fetch Part B content for Part A Part B questions
-      const partAQuestionIds = questionsData
-        .filter((q) => q.question_type === "Part A Part B Question")
-        .map((q) => q.question_id)
-
-      let partBData: any[] = []
-      if (partAQuestionIds.length > 0) {
-        const { data: fetchedPartBData, error: partBError } = await supabase
-          .from("questions_partb")
-          .select("*")
-          .in("part_a_id", partAQuestionIds)
-
-        if (partBError) throw partBError
-        partBData = fetchedPartBData || []
-      }
 
       // Fetch question choices for multiple choice and multiple select questions
       const { data: questionChoicesData, error: questionChoicesError } = await supabase
@@ -533,20 +516,10 @@ export default function ActivitiesPage() {
               .sort((a, b) => a.order - b.order)
           : []
 
-        // Find Part B content if this is a Part A Part B question
-        let partB = null
-        if (question.question_type === "Part A Part B Question") {
-          const partBRecord = partBData.find((pb) => pb.part_a_id === question.question_id)
-          if (partBRecord) {
-            partB = partBRecord.question_text
-          }
-        }
-
-        // Include question_id, answer options, and Part B content in the details
+        // Include question_id and answer options in the details
         detailsMap[typeId] = {
           ...question,
           answerOptions,
-          partB, // Add Part B content
         }
       }
 
@@ -1177,9 +1150,6 @@ export default function ActivitiesPage() {
   // Modify handleSaveQuestion
   const handleSaveQuestion = async (question: Question) => {
     if (!currentActivityType) return
-
-    console.log("Saving question:", question)
-    console.log("Current activity type:", currentActivityType)
 
     // Check if we're editing an existing activity type or adding a new one
     const isEditing = activityTypes[currentActivityType.activity_id]?.some((type) => type.id === currentActivityType.id)
@@ -2073,42 +2043,6 @@ export default function ActivitiesPage() {
                 }
                 console.log("Question updated successfully:", updateResult)
 
-                // If this is a Part A Part B Question, update or create the Part B record
-                if (questionDetails.question_type === "Part A Part B Question") {
-                  // Check if a Part B record already exists
-                  const { data: existingPartB } = await supabase
-                    .from("questions_partb")
-                    .select("*")
-                    .eq("part_a_id", questionDetails.question_id)
-                    .single()
-
-                  if (existingPartB) {
-                    // Update existing Part B
-                    const { error: updatePartBError } = await supabase
-                      .from("questions_partb")
-                      .update({
-                        question_text: questionDetails.partB || null,
-                      })
-                      .eq("part_a_id", questionDetails.question_id)
-
-                    if (updatePartBError) {
-                      console.error("Error updating Part B:", updatePartBError)
-                      throw updatePartBError
-                    }
-                  } else {
-                    // Create new Part B record
-                    const { error: insertPartBError } = await supabase.from("questions_partb").insert({
-                      part_a_id: questionDetails.question_id,
-                      question_text: questionDetails.partB || null,
-                    })
-
-                    if (insertPartBError) {
-                      console.error("Error inserting Part B:", insertPartBError)
-                      throw insertPartBError
-                    }
-                  }
-                }
-
                 // Call the new component to save the question choices
                 if (questionDetails.answerOptions) {
                   try {
@@ -2156,19 +2090,6 @@ export default function ActivitiesPage() {
                   throw insertQuestionError
                 }
                 console.log("Question inserted successfully:", insertResult)
-
-                // If this is a Part A Part B Question, create the Part B record
-                if (questionDetails.question_type === "Part A Part B Question") {
-                  const { error: insertPartBError } = await supabase.from("questions_partb").insert({
-                    part_a_id: questionDetails.question_id,
-                    question_text: questionDetails.partB || null,
-                  })
-
-                  if (insertPartBError) {
-                    console.error("Error inserting Part B:", insertPartBError)
-                    throw insertPartBError
-                  }
-                }
 
                 // Call the new component to save the question choices
                 if (questionDetails.answerOptions) {
@@ -2286,7 +2207,8 @@ export default function ActivitiesPage() {
                   description_title: imageDetails.description_title || null,
                   description: imageDetails.description || null,
                   alt: imageDetails.alt || null,
-                  position: activityType.order,
+                  position: imageDetails.position || "center",
+                  order: activityType.order,
                   published: imageDetails.published || "No",
                 })
 
@@ -3257,3 +3179,4 @@ export default function ActivitiesPage() {
     </DashboardLayout>
   )
 }
+

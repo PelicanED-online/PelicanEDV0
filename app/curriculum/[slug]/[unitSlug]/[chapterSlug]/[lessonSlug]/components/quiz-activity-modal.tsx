@@ -153,3 +153,4 @@ export function QuizActivityModal({ isOpen, onClose, onSave, quiz }: QuizActivit
     </div>
   )
 }
+

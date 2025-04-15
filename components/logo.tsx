@@ -31,3 +31,4 @@ export function LogoWithText({ className }: LogoProps) {
     </div>
   )
 }
+

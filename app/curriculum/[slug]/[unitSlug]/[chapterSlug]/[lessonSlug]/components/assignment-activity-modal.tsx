@@ -124,3 +124,4 @@ export function AssignmentActivityModal({ isOpen, onClose, onSave, assignment }:
     </div>
   )
 }
+

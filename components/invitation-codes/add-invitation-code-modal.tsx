@@ -461,3 +461,4 @@ export function AddInvitationCodeModal({ isOpen, onClose, onAddCode, currentUser
     </Dialog>
   )
 }
+

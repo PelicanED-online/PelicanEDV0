@@ -164,3 +164,4 @@ export function ImageActivityModal({ open, setOpen, onSubmit }: ImageActivityMod
     </Dialog>
   )
 }
+

@@ -107,3 +107,4 @@ export function SourceActivityModal({ open, onOpenChange, activity, initialData,
     </Dialog>
   )
 }
+

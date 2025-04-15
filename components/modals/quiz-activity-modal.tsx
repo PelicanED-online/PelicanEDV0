@@ -205,3 +205,4 @@ export function QuizActivityModal({ open, setOpen }: QuizActivityModalProps) {
     </Dialog>
   )
 }
+

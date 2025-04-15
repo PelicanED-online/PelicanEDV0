@@ -40,7 +40,6 @@ interface AnswerOption {
   order: number // Add order field
 }
 
-// Update the Question interface to include partB field
 interface Question {
   activity_id: string
   question_id?: string
@@ -51,7 +50,6 @@ interface Question {
   question_title?: string
   question_type?: string
   answerOptions?: AnswerOption[]
-  partB?: string // Add this field for Part B content
 }
 
 interface QuestionActivityModalProps {
@@ -76,14 +74,12 @@ export function QuestionActivityModal({
     question_text: "",
     published: "No", // Default to "No"
     answerOptions: [],
-    partB: "",
   })
 
   const [showQuestionFields, setShowQuestionFields] = useState(false)
   const [isMultipleChoice, setIsMultipleChoice] = useState(false)
   const { toast } = useToast()
 
-  // In the useEffect hook, update the formData initialization to include partB
   useEffect(() => {
     if (activity && open) {
       // If initialData has answerOptions with order, use them
@@ -121,7 +117,6 @@ export function QuestionActivityModal({
         question_title: initialData?.question_title || "",
         // Handle backward compatibility - if question_text exists use it, otherwise use question
         question_text: initialData?.question_text || initialData?.question || "",
-        partB: initialData?.partB || "", // Initialize partB field
         order: activity.order,
         published: initialData?.published || "No",
         answerOptions: answerOptions,
@@ -140,14 +135,6 @@ export function QuestionActivityModal({
     setFormData((prev) => ({
       ...prev,
       question_text: value,
-    }))
-  }
-
-  // Add a handler for Part B text changes
-  const handlePartBTextChange = (value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      partB: value,
     }))
   }
 
@@ -346,7 +333,6 @@ export function QuestionActivityModal({
                       {formData.question_type || "Select a Question Type"}
                     </SelectValue>
                   </SelectTrigger>
-                  {/* In the SelectContent component, add the new question type option */}
                   <SelectContent>
                     <SelectItem value="none">Select a Question Type</SelectItem>
                     <SelectItem value="Open Ended">Open Ended</SelectItem>
@@ -354,7 +340,6 @@ export function QuestionActivityModal({
                     <SelectItem value="Supporting Question">Supporting Question</SelectItem>
                     <SelectItem value="Multiple Choice">Multiple Choice</SelectItem>
                     <SelectItem value="Multiple Select">Multiple Select</SelectItem>
-                    <SelectItem value="Part A Part B Question">Part A Part B Question</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -390,24 +375,6 @@ export function QuestionActivityModal({
                     />
                   </div>
                 </div>
-
-                {/* After the question text field and before the Multiple Choice/Select Answer Options section,
-                add the Part B field that shows only when the question type is "Part A Part B Question" */}
-                {formData.question_type === "Part A Part B Question" && (
-                  <div className="grid grid-cols-4 items-start gap-4">
-                    <Label htmlFor="question-part-b" className="text-right pt-2">
-                      Part B
-                    </Label>
-                    <div className="col-span-3">
-                      <RichTextEditor
-                        value={formData.partB || ""}
-                        onChange={handlePartBTextChange}
-                        placeholder="Enter Part B of your question here"
-                        className="min-h-[150px]"
-                      />
-                    </div>
-                  </div>
-                )}
 
                 {/* Multiple Choice/Select Answer Options */}
                 {isMultipleChoice && (
@@ -527,3 +494,4 @@ export function QuestionActivityModal({
     </Dialog>
   )
 }
+

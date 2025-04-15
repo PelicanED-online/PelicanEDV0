@@ -19,3 +19,4 @@ const SectionItem: React.FC<SectionItemProps> = ({ item }) => {
 }
 
 export default SectionItem
+

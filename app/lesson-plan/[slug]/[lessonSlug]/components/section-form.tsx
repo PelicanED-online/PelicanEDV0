@@ -40,3 +40,4 @@ const SectionForm: React.FC<SectionFormProps> = ({ onSubmit, initialValues }) =>
 }
 
 export default SectionForm
+

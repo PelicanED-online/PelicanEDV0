@@ -114,3 +114,4 @@ export function AddSchoolModal({ isOpen, onClose, onAddSchool, districts }: AddS
     </Dialog>
   )
 }
+

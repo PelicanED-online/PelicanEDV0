@@ -105,3 +105,4 @@ export function ReadingActivityModal({ open, setOpen, isSubReading, onSubmit }: 
     </Dialog>
   )
 }
+

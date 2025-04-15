@@ -152,3 +152,4 @@ export function EditLessonModal({ lesson, onLessonUpdated }: EditLessonModalProp
     </Dialog>
   )
 }
+

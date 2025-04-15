@@ -123,3 +123,4 @@ export function VideoActivityModal({ isOpen, onClose, onSave, video }: VideoActi
     </div>
   )
 }
+

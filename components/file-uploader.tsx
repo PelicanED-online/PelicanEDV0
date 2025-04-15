@@ -120,3 +120,4 @@ export function FileUploader({ onUpload, accept = "*", maxSize = 10 * 1024 * 102
     </div>
   )
 }
+

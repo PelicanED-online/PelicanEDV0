@@ -179,3 +179,4 @@ export function EditChapterModal({ chapter, onChapterUpdated }: EditChapterModal
     </Dialog>
   )
 }
+

@@ -183,3 +183,4 @@ export function AddLessonPlanModal({ isOpen, onClose, subjectId, onSuccess }: Ad
     </Dialog>
   )
 }
+
