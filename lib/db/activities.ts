@@ -582,6 +582,7 @@ export async function saveActivities(
             await saveQuestion(activityType, details, activity.activity_id)
             break
           case "graphic_organizer":
+            console.log("Saving graphic organizer:", activityType, details, activity.activity_id)
             await saveGraphicOrganizer(activityType, details, activity.activity_id)
             break
           case "vocabulary":
@@ -967,6 +968,7 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
     }
   } else {
     // Insert as new graphic organizer
+    console.log("Inserting new graphic organizer:", details)
     const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
       go_id: details.go_id,
       activity_id: activityId,
