@@ -142,4 +142,3 @@ export function ReadingAddonModal({ open, onOpenChange, activity, initialData, o
     </Dialog>
   )
 }
-

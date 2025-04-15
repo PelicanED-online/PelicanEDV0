@@ -100,4 +100,3 @@ export function AssignmentActivityModal({ open, setOpen, onSubmit }: AssignmentA
     </Dialog>
   )
 }
-

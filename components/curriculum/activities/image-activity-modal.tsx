@@ -303,4 +303,3 @@ export function ImageActivityModal({ open, onOpenChange, activity, initialData, 
     </Dialog>
   )
 }
-

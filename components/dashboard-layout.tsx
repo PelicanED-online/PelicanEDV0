@@ -286,4 +286,3 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     </SidebarProvider>
   )
 }
-

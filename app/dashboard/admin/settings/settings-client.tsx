@@ -111,4 +111,3 @@ export default function SettingsClient() {
     </div>
   )
 }
-

@@ -134,4 +134,3 @@ export function AddChapterModal({ unitId, onChapterAdded }: AddChapterModalProps
     </Dialog>
   )
 }
-

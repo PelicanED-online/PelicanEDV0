@@ -9,4 +9,3 @@ export const uploadToS3 = async (file: File, folder = "reading_images"): Promise
 export const deleteFromS3 = async (url: string): Promise<void> => {
   return deleteFromSupabaseStorage(url)
 }
-

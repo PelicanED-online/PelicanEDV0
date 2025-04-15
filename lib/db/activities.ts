@@ -990,7 +990,11 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
       }
     }
 
+    // Generate a new go_id if one doesn't exist
+    const go_id = details.go_id || uuidv4()
+
     const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
+      go_id: go_id,
       activity_id: activityId,
       template_type: details.template_type || null,
       content: contentValue,
@@ -1001,7 +1005,7 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
     if (insertOrganizerError) {
       console.error("Error inserting graphic organizer:", insertOrganizerError)
       console.error("Attempted to insert with values:", {
-        go_id: details.go_id,
+        go_id: go_id,
         activity_id: activityId,
         template_type: details.template_type || null,
         content: contentValue,

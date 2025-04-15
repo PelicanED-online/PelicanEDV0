@@ -304,4 +304,3 @@ export function AddSubscriptionModal({ isOpen, onClose, districts, academicYears
     </Dialog>
   )
 }
-

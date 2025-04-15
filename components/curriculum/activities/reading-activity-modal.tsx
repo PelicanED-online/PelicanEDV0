@@ -165,4 +165,3 @@ export function ReadingActivityModal({ open, onOpenChange, activity, initialData
     </Dialog>
   )
 }
-

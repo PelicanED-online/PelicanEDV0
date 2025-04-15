@@ -100,4 +100,3 @@ export function VideoActivityModal({ open, setOpen, onSubmit }: VideoActivityMod
     </Dialog>
   )
 }
-

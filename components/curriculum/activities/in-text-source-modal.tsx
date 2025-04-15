@@ -117,4 +117,3 @@ export function InTextSourceModal({ open, onOpenChange, activity, initialData, o
     </Dialog>
   )
 }
-

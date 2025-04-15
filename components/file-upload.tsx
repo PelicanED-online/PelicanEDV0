@@ -78,4 +78,3 @@ export function FileUpload({ onChange, value, endpoint, onUploadComplete }: File
     </div>
   )
 }
-

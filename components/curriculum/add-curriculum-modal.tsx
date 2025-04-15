@@ -143,4 +143,3 @@ export function AddCurriculumModal({ onCurriculumAdded }: { onCurriculumAdded: (
     </Dialog>
   )
 }
-

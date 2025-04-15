@@ -133,4 +133,3 @@ export function AddUnitModal({ subjectId, onUnitAdded }: AddUnitModalProps) {
     </Dialog>
   )
 }
-

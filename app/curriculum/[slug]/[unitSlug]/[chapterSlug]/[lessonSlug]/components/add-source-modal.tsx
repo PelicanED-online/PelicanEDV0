@@ -87,4 +87,3 @@ export function AddSourceModal({ onSubmit, trigger }: AddSourceModalProps) {
     </AlertDialog>
   )
 }
-

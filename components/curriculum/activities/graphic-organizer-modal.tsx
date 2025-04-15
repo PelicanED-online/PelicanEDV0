@@ -3,19 +3,23 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { v4 as uuidv4 } from "uuid"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { useRouter } from "next/navigation"
+import { Textarea } from "@/components/ui/textarea"
+import { toast } from "@/hooks/use-toast"
+// import { v4 as uuidv4 } from 'uuid'; // Removed duplicate import
 
 interface ActivityType {
   id: string
@@ -26,7 +30,7 @@ interface ActivityType {
 
 interface GraphicOrganizer {
   activity_id: string
-  go_id?: string // Add go_id field
+  go_id?: string
   content?: any
   order?: number
   template_type?: string
@@ -48,23 +52,26 @@ export function GraphicOrganizerModal({
   initialData,
   onSave,
 }: GraphicOrganizerModalProps) {
+  const router = useRouter()
   const [formData, setFormData] = useState<GraphicOrganizer>({
     activity_id: "",
     template_type: "",
     content: {},
     published: "No", // Default to "No"
   })
+  const [jsonResult, setJsonResult] = useState<string>("")
 
   useEffect(() => {
     if (activity && open) {
       setFormData({
         activity_id: activity.activity_id,
-        go_id: initialData?.go_id, // Include go_id if it exists
+        go_id: initialData?.go_id || uuidv4(), // Generate a new UUID if go_id doesn't exist
         template_type: initialData?.template_type || "",
         content: initialData?.content || {},
         order: activity.order,
         published: initialData?.published || "No", // Default to "No" if not set
       })
+      setJsonResult(JSON.stringify(initialData?.content, null, 2) || "")
     }
   }, [activity, initialData, open])
 
@@ -72,39 +79,54 @@ export function GraphicOrganizerModal({
     setFormData((prev) => ({
       ...prev,
       template_type: value,
-      // Reset content when template changes
-      content: {},
     }))
-  }
-
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    try {
-      const content = JSON.parse(e.target.value)
-      setFormData((prev) => ({
-        ...prev,
-        content,
-      }))
-    } catch (error) {
-      // Handle invalid JSON
-      console.error("Invalid JSON:", error)
-    }
   }
 
   const handleSwitchChange = (checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
-      published: checked ? "Yes" : "No", // Convert boolean to "Yes"/"No"
+      published: checked ? "Yes" : "No",
     }))
+  }
+
+  const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setJsonResult(e.target.value)
+    try {
+      const parsedContent = JSON.parse(e.target.value)
+      setFormData((prev) => ({
+        ...prev,
+        content: parsedContent,
+      }))
+    } catch (error) {
+      console.error("Invalid JSON:", error)
+    }
+  }
+
+  const handleSaveTable = () => {
+    try {
+      const parsedContent = JSON.parse(jsonResult)
+      onSave({
+        ...formData,
+        go_id: formData.go_id, // Ensure go_id is explicitly included
+        content: parsedContent,
+      })
+      onOpenChange(false)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Invalid JSON format. Please check your JSON data.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(formData)
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Graphic Organizer Activity</DialogTitle>
           <DialogDescription>
@@ -124,31 +146,35 @@ export function GraphicOrganizerModal({
                     <SelectValue placeholder="Select a template" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="venn_diagram">Venn Diagram</SelectItem>
-                    <SelectItem value="concept_map">Concept Map</SelectItem>
-                    <SelectItem value="timeline">Timeline</SelectItem>
-                    <SelectItem value="t_chart">T-Chart</SelectItem>
-                    <SelectItem value="kwl_chart">KWL Chart</SelectItem>
+                    <SelectItem value="Table">Table</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {formData.template_type && (
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="content" className="text-right pt-2">
-                  Content (JSON)
-                </Label>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="json-data" className="text-right pt-2">
+                JSON Data
+              </Label>
+              <div className="col-span-3">
                 <Textarea
-                  id="content"
-                  value={JSON.stringify(formData.content, null, 2)}
-                  onChange={handleContentChange}
-                  className="col-span-3 font-mono text-sm"
-                  rows={10}
-                  placeholder="Enter JSON configuration for this template"
+                  id="json-data"
+                  value={jsonResult}
+                  onChange={handleJsonChange}
+                  className="min-h-[200px]"
+                  placeholder="Enter JSON data for the graphic organizer"
                 />
+                <a
+                  href="/graphic-organizer-json"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 px-4 py-2 bg-secondary hover:bg-secondary/80 mt-2"
+                >
+                  Open JSON Editor in New Tab
+                </a>
               </div>
-            )}
+            </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="published" className="text-right">
                 Published
@@ -164,7 +190,10 @@ export function GraphicOrganizerModal({
         </div>
 
         <DialogFooter className="flex-shrink-0 pt-2 border-t">
-          <Button type="submit" onClick={handleSubmit}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSaveTable}>
             Save Changes
           </Button>
         </DialogFooter>
@@ -172,4 +201,3 @@ export function GraphicOrganizerModal({
     </Dialog>
   )
 }
-

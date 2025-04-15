@@ -241,4 +241,3 @@ export function AddUserModal({ isOpen, onClose, onAddUser }: AddUserModalProps) 
     </Dialog>
   )
 }
-

@@ -18,4 +18,3 @@ const addOption = (questionIndex: number) => {
   ]
   setQuestions(newQuestions)
 }
-

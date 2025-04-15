@@ -33,4 +33,3 @@ export function isDomainAllowed(domain: string, allowedDomains: string[]): boole
     return domain.toLowerCase() === allowedDomain.toLowerCase()
   })
 }
-

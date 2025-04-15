@@ -178,4 +178,3 @@ export function EditUnitModal({ unit, onUnitUpdated }: EditUnitModalProps) {
     </Dialog>
   )
 }
-

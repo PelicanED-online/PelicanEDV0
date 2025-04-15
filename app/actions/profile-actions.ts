@@ -24,4 +24,3 @@ export async function updateUserProfile(userId: string, data: { firstName: strin
     return { success: false, error: "An unexpected error occurred" }
   }
 }
-
