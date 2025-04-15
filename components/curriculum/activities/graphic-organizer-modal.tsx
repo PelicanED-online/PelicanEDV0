@@ -8,9 +8,9 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -161,6 +161,14 @@ export function GraphicOrganizerModal({
                   className="min-h-[200px]"
                   placeholder="Enter JSON data for the graphic organizer"
                 />
+                <a
+                  href="/graphic-organizer-json"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 px-4 py-2 bg-secondary hover:bg-secondary/80 mt-2"
+                >
+                  Open JSON Editor in New Tab
+                </a>
               </div>
             </div>
 
@@ -179,7 +187,7 @@ export function GraphicOrganizerModal({
         </div>
 
         <DialogFooter className="flex-shrink-0 pt-2 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button type="submit" onClick={handleSaveTable}>
