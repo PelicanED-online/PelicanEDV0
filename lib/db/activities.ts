@@ -473,7 +473,7 @@ export async function fetchActivitiesOld(lessonId: string) {
       detailsMap[typeId] = {
         activity_id: activityId,
         order: activityOrder, // Also store the order in the details
-        published: activity?.published || "No",
+        published: activitiesData?.find((activity) => activity.activity_id === activityId)?.published || "No",
         items: vocabularyByActivity[activityId],
       }
     }
@@ -590,6 +590,8 @@ export async function saveActivities(
             await saveImage(activityType, details, activity.activity_id)
             break
         }
+
+        await cleanupDeletedItems(activity.activity_id, updatedTypes, activityTypeDetails)
       }
 
       // Clean up any sections in the database that are no longer in our state
@@ -877,12 +879,7 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
     // Save question choices
     if (details.answerOptions && details.answerOptions.length > 0) {
       // First delete existing choices
-      await supabase
-        .from("question_choices")
-        .delete()
-        .eq('question_id", details.question_id)stion_choices')
-        .delete()
-        .eq("question_id", details.question_id)
+      await supabase.from("question_choices").delete().eq("question_id", details.question_id)
 
       // Then insert new choices
       const choicesToInsert = details.answerOptions.map((option, index) => ({
