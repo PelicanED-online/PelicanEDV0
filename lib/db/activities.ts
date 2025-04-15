@@ -392,6 +392,7 @@ export async function fetchActivitiesOld(lessonId: string) {
       })
 
       // Include go_id in the details
+      console.log("Graphic organizer details:", organizer)
       detailsMap[typeId] = {
         ...organizer,
       }
@@ -940,6 +941,7 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
 }
 
 async function saveGraphicOrganizer(activityType: ActivityType, details: any, activityId: string) {
+  console.log("Saving graphic organizer:", activityType, details, activityId)
   // Check if this is an update or a new graphic organizer
   const { data: existingOrganizer } = await supabase
     .from("graphic_organizers")
