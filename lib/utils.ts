@@ -14,3 +14,13 @@ export function generateSlug(text: string): string {
     .replace(/^-+/, "") // Trim - from start of text
     .replace(/-+$/, "") // Trim - from end of text
 }
+
+export function capitalizeText(text: string): string {
+  if (!text) return ""
+
+  // Split the text by spaces and capitalize each word
+  return text
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
+}

@@ -11,7 +11,17 @@ interface ClassItem {
   created_at: string
 }
 
-// Replace the existing getClassesForSlug function with this enhanced version:
+// Helper function to properly capitalize text
+function capitalizeText(text: string): string {
+  if (!text) return ""
+
+  // Split the text by spaces and capitalize each word
+  return text
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
+}
+
 async function getClassesForSlug(slug: string) {
   try {
     console.log(`Getting classes for slug: ${slug}`)
@@ -25,12 +35,12 @@ async function getClassesForSlug(slug: string) {
 
     if (authError) {
       console.error("Error getting authenticated user:", authError)
-      return { classes: [], subjectName: slug.replace(/-/g, " ") }
+      return { classes: [], subjectName: capitalizeText(slug.replace(/-/g, " ")) }
     }
 
     if (!authData || !authData.user) {
       console.error("No authenticated user found")
-      return { classes: [], subjectName: slug.replace(/-/g, " ") }
+      return { classes: [], subjectName: capitalizeText(slug.replace(/-/g, " ")) }
     }
 
     const userId = authData.user.id
@@ -63,11 +73,12 @@ async function getClassesForSlug(slug: string) {
     }
 
     let subjectId = null
-    let subjectName = slug.replace(/-/g, " ")
+    let subjectName = capitalizeText(slug.replace(/-/g, " "))
 
     if (subjectData && subjectData.length > 0) {
       subjectId = subjectData[0].subject_id
-      subjectName = subjectData[0].name || subjectName
+      // Apply capitalization to ensure consistency
+      subjectName = capitalizeText(subjectData[0].name || subjectName)
       console.log(`Found subject in invitation_code_usage_view: ${subjectName} with ID: ${subjectId}`)
     } else {
       console.log("No subject found in invitation_code_usage_view, trying subjects table")
@@ -83,7 +94,8 @@ async function getClassesForSlug(slug: string) {
         console.error("Error fetching from subjects table:", directSubjectError)
       } else if (directSubjectData && directSubjectData.length > 0) {
         subjectId = directSubjectData[0].subject_id
-        subjectName = directSubjectData[0].name || subjectName
+        // Apply capitalization to ensure consistency
+        subjectName = capitalizeText(directSubjectData[0].name || subjectName)
         console.log(`Found subject in subjects table: ${subjectName} with ID: ${subjectId}`)
       } else {
         console.log("No subject found in subjects table either")
@@ -144,7 +156,7 @@ async function getClassesForSlug(slug: string) {
     }
   } catch (error) {
     console.error("Unexpected error in getClassesForSlug:", error)
-    return { classes: [], subjectName: slug.replace(/-/g, " ") }
+    return { classes: [], subjectName: capitalizeText(slug.replace(/-/g, " ")) }
   }
 }
 
