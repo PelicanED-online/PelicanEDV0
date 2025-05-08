@@ -4,6 +4,7 @@ import { Eye, Send, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { supabase } from "@/lib/supabase"
+import { capitalizeText } from "@/lib/utils"
 
 interface Lesson {
   id: string
@@ -13,7 +14,7 @@ interface Lesson {
 }
 
 interface Subject {
-  subject_id: string // Changed from id to subject_id
+  subject_id: string
   name: string
 }
 
@@ -21,31 +22,79 @@ async function getLessonsForSlug(slug: string) {
   console.log("Getting lessons for slug:", slug)
 
   try {
-    // Log environment information to help diagnose issues
+    // Log environment information
     console.log(
       "Environment check - NEXT_PUBLIC_SUPABASE_URL:",
       process.env.NEXT_PUBLIC_SUPABASE_URL ? "Set" : "Not set",
     )
 
-    // First, check if the invitation_code_usage_view table has any data at all
-    const { data: sampleData, error: sampleError } = await supabase
-      .from("invitation_code_usage_view")
-      .select("name, subject_id")
-      .limit(1)
+    // First, check if we can access the lessons table at all
+    const { data: sampleLessons, error: sampleLessonsError } = await supabase.from("lessons").select("*").limit(5)
 
-    if (sampleError) {
-      console.error("Error accessing invitation_code_usage_view table:", sampleError)
-      console.log("The invitation_code_usage_view table might not exist or is inaccessible")
-    } else {
-      console.log("Sample data from invitation_code_usage_view:", sampleData)
+    if (sampleLessonsError) {
+      console.error("Error accessing lessons table:", sampleLessonsError)
+      return {
+        subjectName: slug.replace(/-/g, " "),
+        lessons: [],
+        diagnosticInfo: {
+          error: "Cannot access lessons table",
+          errorDetails: sampleLessonsError.message,
+          sampleLessons: null,
+        },
+      }
     }
 
-    // Try to get all subjects first as our primary approach
+    console.log("Sample lessons (first 5):", sampleLessons)
+
+    if (!sampleLessons || sampleLessons.length === 0) {
+      console.log("No lessons found in the database at all")
+      return {
+        subjectName: slug.replace(/-/g, " "),
+        lessons: [],
+        diagnosticInfo: {
+          error: "No lessons in database",
+          sampleLessons: [],
+        },
+      }
+    }
+
+    // Try to get all subjects
     const { data: subjects, error: subjectsError } = await supabase.from("subjects").select("subject_id, name")
 
     if (subjectsError) {
       console.error("Error fetching subjects:", subjectsError)
-      return { subjectName: slug, lessons: [] }
+      // If we can't get subjects, let's try to get lessons directly
+      const { data: directLessons, error: directLessonsError } = await supabase
+        .from("lessons")
+        .select("*")
+        .order("lesson_name", { ascending: true })
+        .limit(20)
+
+      if (directLessonsError) {
+        console.error("Error fetching direct lessons:", directLessonsError)
+        return {
+          subjectName: slug.replace(/-/g, " "),
+          lessons: [],
+          diagnosticInfo: {
+            error: "Cannot fetch subjects or direct lessons",
+            subjectsError: subjectsError.message,
+            directLessonsError: directLessonsError.message,
+            sampleLessons,
+          },
+        }
+      }
+
+      console.log(`Found ${directLessons?.length || 0} direct lessons without subject filtering`)
+      return {
+        subjectName: slug.replace(/-/g, " "),
+        lessons: directLessons || [],
+        diagnosticInfo: {
+          note: "Using direct lessons without subject filtering",
+          subjectsError: subjectsError.message,
+          sampleLessons,
+          directLessons,
+        },
+      }
     }
 
     console.log("All subjects:", subjects)
@@ -79,29 +128,33 @@ async function getLessonsForSlug(slug: string) {
     }
 
     // If we still don't have a match, try to get the subject_id from invitation_code_usage_view
-    if (!matchingSubject && sampleData && sampleData.length > 0) {
+    if (!matchingSubject) {
       console.log("Trying to find subject_id in invitation_code_usage_view for slug:", slug)
 
       // Try with spaces instead of hyphens
       const slugWithSpaces = slug.replace(/-/g, " ")
 
-      const { data: invitationData } = await supabase
+      const { data: invitationData, error: invitationError } = await supabase
         .from("invitation_code_usage_view")
         .select("name, subject_id")
         .or(`name.ilike.%${slug}%,name.ilike.%${slugWithSpaces}%`)
 
-      console.log("Invitation data for slug:", invitationData)
+      if (invitationError) {
+        console.error("Error querying invitation_code_usage_view:", invitationError)
+      } else {
+        console.log("Invitation data for slug:", invitationData)
 
-      if (invitationData && invitationData.length > 0) {
-        const subjectId = invitationData[0].subject_id
+        if (invitationData && invitationData.length > 0) {
+          const subjectId = invitationData[0].subject_id
 
-        // Find the subject with this ID
-        matchingSubject = subjects?.find((s) => s.subject_id === subjectId)
+          // Find the subject with this ID
+          matchingSubject = subjects?.find((s) => s.subject_id === subjectId)
 
-        if (!matchingSubject && subjectId) {
-          // If we have a subject_id but no matching subject, create a placeholder
-          matchingSubject = { subject_id: subjectId, name: invitationData[0].name || slug }
-          console.log("Created placeholder subject from invitation data:", matchingSubject)
+          if (!matchingSubject && subjectId) {
+            // If we have a subject_id but no matching subject, create a placeholder
+            matchingSubject = { subject_id: subjectId, name: invitationData[0].name || slug }
+            console.log("Created placeholder subject from invitation data:", matchingSubject)
+          }
         }
       }
     }
@@ -116,6 +169,28 @@ async function getLessonsForSlug(slug: string) {
     if (!matchingSubject) {
       console.log("No subjects found at all, creating placeholder")
       matchingSubject = { subject_id: "unknown", name: slug.replace(/-/g, " ") }
+
+      // Since we couldn't find a subject, let's return all lessons as a fallback
+      const { data: allLessons, error: allLessonsError } = await supabase
+        .from("lessons")
+        .select("*")
+        .order("lesson_name", { ascending: true })
+        .limit(20)
+
+      if (allLessonsError) {
+        console.error("Error fetching all lessons:", allLessonsError)
+      } else {
+        console.log(`Found ${allLessons?.length || 0} lessons without subject filtering`)
+        return {
+          subjectName: matchingSubject.name,
+          lessons: allLessons || [],
+          diagnosticInfo: {
+            note: "Using all lessons without subject filtering",
+            matchingSubject,
+            sampleLessons,
+          },
+        }
+      }
     }
 
     console.log("Using subject:", matchingSubject)
@@ -128,10 +203,41 @@ async function getLessonsForSlug(slug: string) {
       .order("lesson_name", { ascending: true })
 
     if (lessonsError) {
-      console.error("Error fetching lessons:", lessonsError)
+      console.error("Error fetching lessons for subject:", lessonsError)
+
+      // Try a more permissive query as fallback
+      const { data: fallbackLessons, error: fallbackError } = await supabase
+        .from("lessons")
+        .select("*")
+        .order("lesson_name", { ascending: true })
+        .limit(20)
+
+      if (fallbackError) {
+        console.error("Error fetching fallback lessons:", fallbackError)
+        return {
+          subjectName: matchingSubject.name,
+          lessons: [],
+          diagnosticInfo: {
+            error: "Cannot fetch lessons for subject or fallback lessons",
+            lessonsError: lessonsError.message,
+            fallbackError: fallbackError.message,
+            matchingSubject,
+            sampleLessons,
+          },
+        }
+      }
+
+      console.log(`Found ${fallbackLessons?.length || 0} fallback lessons without subject filtering`)
       return {
         subjectName: matchingSubject.name,
-        lessons: [],
+        lessons: fallbackLessons || [],
+        diagnosticInfo: {
+          note: "Using fallback lessons without subject filtering",
+          lessonsError: lessonsError.message,
+          matchingSubject,
+          sampleLessons,
+          fallbackLessons,
+        },
       }
     }
 
@@ -139,44 +245,86 @@ async function getLessonsForSlug(slug: string) {
       `Found ${lessons?.length || 0} lessons for subject ${matchingSubject.name} (ID: ${matchingSubject.subject_id})`,
     )
 
-    // If no lessons found, try a more permissive query as fallback
+    // If no lessons found with the subject_id, try a more permissive query
     if (!lessons || lessons.length === 0) {
-      console.log("No lessons found with exact subject_id match, trying to get any lessons")
+      console.log("No lessons found with exact subject_id match, trying fallback query")
 
-      // Get a sample of lessons to see if the table has data
-      const { data: sampleLessons, error: sampleLessonsError } = await supabase.from("lessons").select("*").limit(5)
+      // Try a more permissive query as fallback
+      const { data: fallbackLessons, error: fallbackError } = await supabase
+        .from("lessons")
+        .select("*")
+        .order("lesson_name", { ascending: true })
+        .limit(20)
 
-      if (sampleLessonsError) {
-        console.error("Error fetching sample lessons:", sampleLessonsError)
-      } else {
-        console.log("Sample lessons data:", sampleLessons)
+      if (fallbackError) {
+        console.error("Error fetching fallback lessons:", fallbackError)
+        return {
+          subjectName: matchingSubject.name,
+          lessons: [],
+          diagnosticInfo: {
+            error: "No lessons for subject and cannot fetch fallback lessons",
+            fallbackError: fallbackError.message,
+            matchingSubject,
+            sampleLessons,
+          },
+        }
+      }
+
+      console.log(`Found ${fallbackLessons?.length || 0} fallback lessons without subject filtering`)
+      return {
+        subjectName: matchingSubject.name,
+        lessons: fallbackLessons || [],
+        diagnosticInfo: {
+          note: "Using fallback lessons without subject filtering",
+          matchingSubject,
+          sampleLessons,
+          fallbackLessons,
+        },
       }
     }
 
     return {
       subjectName: matchingSubject.name,
       lessons: lessons || [],
+      diagnosticInfo: {
+        note: "Successfully found lessons for subject",
+        matchingSubject,
+        lessonCount: lessons?.length || 0,
+      },
     }
   } catch (error) {
     console.error("Unexpected error in getLessonsForSlug:", error)
-    return { subjectName: slug.replace(/-/g, " "), lessons: [] }
+    return {
+      subjectName: slug.replace(/-/g, " "),
+      lessons: [],
+      diagnosticInfo: {
+        error: "Unexpected error in getLessonsForSlug",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+    }
   }
 }
 
 export default async function LessonsPage({ params }: { params: { slug: string } }) {
   const { slug } = params
-  const { subjectName, lessons } = await getLessonsForSlug(slug)
+  const { subjectName, lessons, diagnosticInfo } = await getLessonsForSlug(slug)
 
   // Format the subject name for display
-  const formattedSubjectName = subjectName
-    ? subjectName.charAt(0).toUpperCase() + subjectName.slice(1)
-    : slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " ")
+  const formattedSubjectName = capitalizeText(subjectName || slug.replace(/-/g, " "))
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">{formattedSubjectName} Lessons</h1>
       </div>
+
+      {/* Temporary diagnostic information - REMOVE AFTER DEBUGGING */}
+      {process.env.NODE_ENV !== "production" && diagnosticInfo && (
+        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-4 text-sm">
+          <h3 className="font-bold mb-2">Diagnostic Information:</h3>
+          <pre className="whitespace-pre-wrap overflow-auto max-h-40">{JSON.stringify(diagnosticInfo, null, 2)}</pre>
+        </div>
+      )}
 
       <div className="rounded-md border">
         <Table>
@@ -219,6 +367,10 @@ export default async function LessonsPage({ params }: { params: { slug: string }
               <TableRow>
                 <TableCell colSpan={2} className="h-24 text-center">
                   No lessons found for this subject.
+                  {/* Show a more detailed message in non-production environments */}
+                  {process.env.NODE_ENV !== "production" && diagnosticInfo?.error && (
+                    <div className="mt-2 text-sm text-gray-500">Reason: {diagnosticInfo.error}</div>
+                  )}
                 </TableCell>
               </TableRow>
             )}
