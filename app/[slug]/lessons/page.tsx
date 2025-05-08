@@ -1,10 +1,9 @@
 import Link from "next/link"
 import { Eye, Send, BarChart3 } from "lucide-react"
-import { cookies } from "next/headers"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { supabase } from "@/lib/supabase"
 import { capitalizeText } from "@/lib/utils"
 
 interface Lesson {
@@ -23,28 +22,6 @@ async function getLessonsForSlug(slug: string) {
   console.log("Getting lessons for slug:", slug)
 
   try {
-    // Create a server component client with cookies
-    const cookieStore = cookies()
-    const supabase = createServerComponentClient({ cookies: () => cookieStore })
-
-    // Check authentication state
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    console.log("Authentication state in getLessonsForSlug:", !!session)
-
-    if (!session) {
-      console.log("No authenticated session found in getLessonsForSlug")
-      return {
-        subjectName: slug.replace(/-/g, " "),
-        lessons: [],
-        diagnosticInfo: {
-          error: "No authenticated session",
-          authenticated: false,
-        },
-      }
-    }
-
     // Log environment information
     console.log(
       "Environment check - NEXT_PUBLIC_SUPABASE_URL:",
@@ -63,7 +40,6 @@ async function getLessonsForSlug(slug: string) {
           error: "Cannot access lessons table",
           errorDetails: sampleLessonsError.message,
           sampleLessons: null,
-          authenticated: !!session,
         },
       }
     }
@@ -78,7 +54,6 @@ async function getLessonsForSlug(slug: string) {
         diagnosticInfo: {
           error: "No lessons in database",
           sampleLessons: [],
-          authenticated: !!session,
         },
       }
     }
@@ -105,7 +80,6 @@ async function getLessonsForSlug(slug: string) {
             subjectsError: subjectsError.message,
             directLessonsError: directLessonsError.message,
             sampleLessons,
-            authenticated: !!session,
           },
         }
       }
@@ -119,7 +93,6 @@ async function getLessonsForSlug(slug: string) {
           subjectsError: subjectsError.message,
           sampleLessons,
           directLessons,
-          authenticated: !!session,
         },
       }
     }
@@ -215,7 +188,6 @@ async function getLessonsForSlug(slug: string) {
             note: "Using all lessons without subject filtering",
             matchingSubject,
             sampleLessons,
-            authenticated: !!session,
           },
         }
       }
@@ -251,7 +223,6 @@ async function getLessonsForSlug(slug: string) {
             fallbackError: fallbackError.message,
             matchingSubject,
             sampleLessons,
-            authenticated: !!session,
           },
         }
       }
@@ -266,7 +237,6 @@ async function getLessonsForSlug(slug: string) {
           matchingSubject,
           sampleLessons,
           fallbackLessons,
-          authenticated: !!session,
         },
       }
     }
@@ -296,7 +266,6 @@ async function getLessonsForSlug(slug: string) {
             fallbackError: fallbackError.message,
             matchingSubject,
             sampleLessons,
-            authenticated: !!session,
           },
         }
       }
@@ -310,7 +279,6 @@ async function getLessonsForSlug(slug: string) {
           matchingSubject,
           sampleLessons,
           fallbackLessons,
-          authenticated: !!session,
         },
       }
     }
@@ -322,7 +290,6 @@ async function getLessonsForSlug(slug: string) {
         note: "Successfully found lessons for subject",
         matchingSubject,
         lessonCount: lessons?.length || 0,
-        authenticated: !!session,
       },
     }
   } catch (error) {
@@ -345,26 +312,14 @@ export default async function LessonsPage({ params }: { params: { slug: string }
   // Format the subject name for display
   const formattedSubjectName = capitalizeText(subjectName || slug.replace(/-/g, " "))
 
-  // Check authentication state directly in the page component
-  const cookieStore = cookies()
-  const supabase = createServerComponentClient({ cookies: () => cookieStore })
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">{formattedSubjectName} Lessons</h1>
       </div>
 
-      {/* Authentication status indicator - visible in all environments */}
-      <div className="bg-blue-50 border border-blue-200 p-2 rounded-md text-sm">
-        <p>Authentication status: {session ? "Authenticated" : "Not authenticated"}</p>
-      </div>
-
       {/* Temporary diagnostic information - REMOVE AFTER DEBUGGING */}
-      {diagnosticInfo && (
+      {process.env.NODE_ENV !== "production" && diagnosticInfo && (
         <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-4 text-sm">
           <h3 className="font-bold mb-2">Diagnostic Information:</h3>
           <pre className="whitespace-pre-wrap overflow-auto max-h-40">{JSON.stringify(diagnosticInfo, null, 2)}</pre>
@@ -411,20 +366,10 @@ export default async function LessonsPage({ params }: { params: { slug: string }
             ) : (
               <TableRow>
                 <TableCell colSpan={2} className="h-24 text-center">
-                  {session ? (
-                    <>
-                      No lessons found for this subject.
-                      {diagnosticInfo?.error && (
-                        <div className="mt-2 text-sm text-gray-500">Reason: {diagnosticInfo.error}</div>
-                      )}
-                    </>
-                  ) : (
-                    <div>
-                      <p className="mb-2">You need to be logged in to view lessons.</p>
-                      <Button asChild>
-                        <Link href="/login">Log In</Link>
-                      </Button>
-                    </div>
+                  No lessons found for this subject.
+                  {/* Show a more detailed message in non-production environments */}
+                  {process.env.NODE_ENV !== "production" && diagnosticInfo?.error && (
+                    <div className="mt-2 text-sm text-gray-500">Reason: {diagnosticInfo.error}</div>
                   )}
                 </TableCell>
               </TableRow>

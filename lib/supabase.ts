@@ -1,5 +1,4 @@
 import { createClient as supabaseCreateClient } from "@supabase/supabase-js"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
@@ -13,33 +12,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("Missing Supabase environment variables. Check your .env file or deployment settings.")
 }
 
-// Create a standard Supabase client
 export const supabase = supabaseCreateClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    storageKey: "supabase-auth",
-    detectSessionInUrl: true,
-    flowType: "pkce",
   },
 })
-
-// Create a client component client for use in client components
-export const createClient = () => {
-  return createClientComponentClient({
-    supabaseUrl,
-    supabaseKey: supabaseAnonKey,
-    options: {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        storageKey: "supabase-auth",
-        detectSessionInUrl: true,
-        flowType: "pkce",
-      },
-    },
-  })
-}
 
 // Test the connection
 supabase
@@ -96,7 +74,6 @@ export async function getCurrentUser() {
   console.log("getCurrentUser function called")
 
   try {
-    // First try to get the session
     const {
       data: { session },
       error: sessionError,
@@ -113,7 +90,6 @@ export async function getCurrentUser() {
       return null
     }
 
-    // If we have a session, get the user
     const {
       data: { user },
       error: userError,
@@ -126,7 +102,6 @@ export async function getCurrentUser() {
       return null
     }
 
-    // Get additional user information
     const userInfo = await getUserInformation(user.id)
 
     if (!userInfo) {
@@ -147,3 +122,5 @@ export async function getCurrentUser() {
 export async function signOut() {
   await supabase.auth.signOut()
 }
+
+export const createClient = supabaseCreateClient
