@@ -1435,7 +1435,7 @@ export default function LessonPlanSectionsPage() {
 
       {/* Add Direction Dialog */}
       <Dialog open={addDirectionDialogOpen} onOpenChange={setAddDirectionDialogOpen}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Direction</DialogTitle>
             <DialogDescription>Add a new direction to this section.</DialogDescription>
@@ -1599,7 +1599,7 @@ export default function LessonPlanSectionsPage() {
 
       {/* Delete Direction Confirmation Dialog */}
       <Dialog open={deleteDirectionConfirmOpen} onOpenChange={setDeleteDirectionConfirmOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Delete Direction</DialogTitle>
             <DialogDescription>
@@ -1619,7 +1619,7 @@ export default function LessonPlanSectionsPage() {
 
       {/* Edit Direction Dialog */}
       <Dialog open={editDirectionDialogOpen} onOpenChange={setEditDirectionDialogOpen}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Direction</DialogTitle>
             <DialogDescription>Edit this direction.</DialogDescription>

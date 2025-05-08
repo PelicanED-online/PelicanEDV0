@@ -938,43 +938,28 @@ async function saveQuestion(activityType: ActivityType, details: any, activityId
 }
 
 async function saveGraphicOrganizer(activityType: ActivityType, details: any, activityId: string) {
-  // Check if this is an update or a new graphic organizer
-  const { data: existingOrganizer } = await supabase
-    .from("graphic_organizers")
-    .select("go_id")
-    .eq("go_id", details.go_id)
-    .single()
+  try {
+    // Check if this is an update or a new graphic organizer
+    let existingOrganizer = null
 
-  if (existingOrganizer) {
-    // Update existing graphic organizer
-    const publishedValue = details.published === "Yes" ? "Yes" : "No" // Ensure published value is valid
-    const contentValue = details.content
-    const { error: updateOrganizerError } = await supabase
-      .from("graphic_organizers")
-      .update({
-        template_type: details.template_type || null,
-        content: contentValue,
-        order: activityType.order,
-        published: publishedValue,
-      })
-      .eq("go_id", details.go_id)
+    if (details.go_id) {
+      const { data, error } = await supabase
+        .from("graphic_organizers")
+        .select("*")
+        .eq("go_id", details.go_id)
+        .maybeSingle()
 
-    if (updateOrganizerError) {
-      console.error("Error updating graphic organizer:", updateOrganizerError)
-      console.error("Attempted to update with values:", {
-        go_id: details.go_id,
-        activity_id: activityId,
-        template_type: details.template_type || null,
-        content: contentValue,
-        order: activityType.order,
-        published: publishedValue,
-      })
-      return null
+      if (error) {
+        console.error("Error checking for existing graphic organizer:", error)
+      } else {
+        existingOrganizer = data
+      }
     }
-  } else {
-    // Insert as new graphic organizer
+
+    // Prepare the data
     const publishedValue = details.published === "Yes" ? "Yes" : "No" // Ensure published value is valid
     let contentValue = null
+
     if (details.content) {
       try {
         // If it's a string, parse it to make sure it's valid JSON
@@ -993,18 +978,32 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
     // Generate a new go_id if one doesn't exist
     const go_id = details.go_id || uuidv4()
 
-    const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
-      go_id: go_id,
-      activity_id: activityId,
-      template_type: details.template_type || null,
-      content: contentValue,
-      order: activityType.order,
-      published: publishedValue,
-    })
+    if (existingOrganizer) {
+      // Update existing graphic organizer
+      const { error: updateOrganizerError } = await supabase
+        .from("graphic_organizers")
+        .update({
+          template_type: details.template_type || null,
+          content: contentValue,
+          order: activityType.order,
+          published: publishedValue,
+        })
+        .eq("go_id", go_id)
 
-    if (insertOrganizerError) {
-      console.error("Error inserting graphic organizer:", insertOrganizerError)
-      console.error("Attempted to insert with values:", {
+      if (updateOrganizerError) {
+        console.error("Error updating graphic organizer:", updateOrganizerError)
+        console.error("Attempted to update with values:", {
+          go_id: go_id,
+          template_type: details.template_type || null,
+          content: contentValue,
+          order: activityType.order,
+          published: publishedValue,
+        })
+        return null
+      }
+    } else {
+      // Insert as new graphic organizer
+      const { error: insertOrganizerError } = await supabase.from("graphic_organizers").insert({
         go_id: go_id,
         activity_id: activityId,
         template_type: details.template_type || null,
@@ -1012,8 +1011,25 @@ async function saveGraphicOrganizer(activityType: ActivityType, details: any, ac
         order: activityType.order,
         published: publishedValue,
       })
-      return null
+
+      if (insertOrganizerError) {
+        console.error("Error inserting graphic organizer:", insertOrganizerError)
+        console.error("Attempted to insert with values:", {
+          go_id: go_id,
+          activity_id: activityId,
+          template_type: details.template_type || null,
+          content: contentValue,
+          order: activityType.order,
+          published: publishedValue,
+        })
+        return null
+      }
     }
+
+    return { success: true, go_id }
+  } catch (error) {
+    console.error("Unexpected error in saveGraphicOrganizer:", error)
+    return null
   }
 }
 

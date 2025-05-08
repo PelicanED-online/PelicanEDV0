@@ -16,7 +16,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { getCurrentUser, signOut, type UserRole } from "@/lib/supabase"
+import { getCurrentUser, signOut, supabase, type UserRole } from "@/lib/supabase"
 import {
   LogOut,
   School,
@@ -31,6 +31,10 @@ import {
   BookOpen,
   CreditCard,
   FileText,
+  ChevronDown,
+  ChevronRight,
+  Presentation,
+  NotebookText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTheme as useNextTheme } from "next-themes"
@@ -47,12 +51,26 @@ interface NavItem {
   isActive?: boolean
 }
 
+interface Subject {
+  id?: string
+  name: string
+}
+
+interface UserInformation {
+  firstName: string
+  lastName: string
+}
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<any>(null)
+  const [userInfo, setUserInfo] = useState<UserInformation | null>(null)
   const [loading, setLoading] = useState(true)
+  const [subjects, setSubjects] = useState<Subject[]>([])
   const { setTheme, theme } = useNextTheme()
+  const [openSubjects, setOpenSubjects] = useState<Record<string, boolean>>({})
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadUser() {
@@ -76,6 +94,33 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         }
 
         setUser(currentUser)
+
+        // Set avatar URL if available
+        if (currentUser.user_metadata?.avatar_url) {
+          setAvatarUrl(currentUser.user_metadata.avatar_url)
+        }
+
+        // Directly fetch user information from the database
+        if (currentUser.id) {
+          const { data: userInfoData, error: userInfoError } = await supabase
+            .from("user_information")
+            .select("firstName, lastName")
+            .eq("user_id", currentUser.id)
+            .single()
+
+          if (userInfoError) {
+            console.error("Error fetching user information:", userInfoError)
+          } else if (userInfoData) {
+            console.log("User information fetched:", userInfoData)
+            setUserInfo(userInfoData as UserInformation)
+          }
+        }
+
+        // If user is a teacher, load their subjects
+        const userRole = (currentUser?.userInfo?.role || currentUser?.userInfo?.data?.role || "admin") as UserRole
+        if (userRole === "teacher") {
+          await loadTeacherSubjects(currentUser.id)
+        }
       } catch (error) {
         console.error("Error loading user in dashboard layout:", error)
         router.push("/login")
@@ -87,9 +132,92 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     loadUser()
   }, [router])
 
+  // Add this after the first useEffect
+  useEffect(() => {
+    // Extract the current slug from the pathname
+    const pathParts = pathname.split("/")
+    if (pathParts.length >= 2) {
+      const currentSlug = pathParts[1]
+
+      // Find the matching subject and open its dropdown
+      subjects.forEach((subject) => {
+        const subjectId = subject.id || subject.name
+        const subjectSlug = subject.name.toLowerCase().replace(/\s+/g, "-")
+
+        if (subjectSlug === currentSlug) {
+          setOpenSubjects((prev) => ({
+            ...prev,
+            [subjectId]: true,
+          }))
+        }
+      })
+    }
+  }, [pathname, subjects])
+
+  const loadTeacherSubjects = async (userId: string) => {
+    try {
+      // Get current academic year ID from site_settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from("site_settings")
+        .select("academic_year_id")
+        .single()
+
+      if (settingsError) {
+        console.error("Error fetching academic year ID:", settingsError)
+        return
+      }
+
+      const currentAcademicYearId = settingsData.academic_year_id
+
+      // Get subjects for the teacher
+      const { data: subjectsData, error: subjectsError } = await supabase
+        .from("invitation_code_usage_view")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("academic_year_id", currentAcademicYearId)
+
+      if (subjectsError) {
+        console.error("Error fetching teacher subjects:", subjectsError)
+        return
+      }
+
+      console.log("Teacher subjects:", subjectsData)
+
+      // Map the data to our Subject interface
+      const mappedSubjects =
+        subjectsData?.map((item, index) => ({
+          id: item.id || String(index),
+          name: item.name || "Unknown Subject",
+        })) || []
+
+      setSubjects(mappedSubjects)
+
+      // Initialize open state for each subject (all closed by default)
+      const initialOpenState: Record<string, boolean> = {}
+      mappedSubjects.forEach((subject) => {
+        initialOpenState[subject.id || String(subject.name)] = false
+      })
+      setOpenSubjects(initialOpenState)
+    } catch (error) {
+      console.error("Error loading teacher subjects:", error)
+    }
+  }
+
   const handleSignOut = async () => {
     await signOut()
     router.push("/login")
+  }
+
+  const toggleSubject = (subjectId: string) => {
+    console.log("Toggling subject:", subjectId)
+    setOpenSubjects((prev) => {
+      const newState = {
+        ...prev,
+        [subjectId]: !prev[subjectId],
+      }
+      console.log("New open state:", newState)
+      return newState
+    })
   }
 
   if (loading) {
@@ -105,15 +233,29 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const userRole = (user?.userInfo?.role || user?.userInfo?.data?.role || "admin") as UserRole
   console.log("Dashboard layout - Detected user role:", userRole)
 
-  const userName = user?.userInfo?.firstName
-    ? `${user.userInfo.firstName} ${user.userInfo.lastName || ""}`
-    : user?.email
+  const userName = userInfo?.firstName ? `${userInfo.firstName} ${userInfo.lastName || ""}` : user?.email
 
   const getInitials = () => {
-    if (user?.userInfo?.firstName && user?.userInfo?.lastName) {
-      return `${user.userInfo.firstName[0]}${user.userInfo.lastName[0]}`.toUpperCase()
+    // Log the user information to debug
+    console.log("Getting initials from userInfo:", userInfo)
+
+    // Use the directly fetched user information
+    if (userInfo?.firstName && userInfo?.lastName) {
+      return `${userInfo.firstName[0]}${userInfo.lastName[0]}`.toUpperCase()
     }
-    return user?.email?.[0]?.toUpperCase() || "U"
+
+    // If we have a first name but no last name, use first initial twice
+    if (userInfo?.firstName && !userInfo?.lastName) {
+      return `${userInfo.firstName[0]}${userInfo.firstName[0]}`.toUpperCase()
+    }
+
+    // Fall back to email or a default
+    if (user?.email) {
+      return user.email[0].toUpperCase()
+    }
+
+    // Last resort
+    return "U"
   }
 
   // Toggle theme function
@@ -189,6 +331,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     ]
   }
 
+  // Get the initials once and store them to prevent re-calculation
+  const userInitials = getInitials()
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
@@ -216,6 +361,80 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   {item.title}
                 </Link>
               ))}
+
+              {/* Teacher-specific subject dropdowns */}
+              {userRole === "teacher" && subjects.length > 0 && (
+                <div className="mt-6 space-y-1">
+                  <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    My Subjects
+                  </h3>
+                  {subjects.map((subject) => {
+                    const subjectId = subject.id || subject.name
+                    const isOpen = openSubjects[subjectId] || false
+                    const slug = subject.name.toLowerCase().replace(/\s+/g, "-")
+
+                    return (
+                      <div key={subjectId} className="w-full">
+                        <button
+                          onClick={() => toggleSubject(subjectId)}
+                          className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md hover:bg-muted"
+                        >
+                          <span className="flex items-center">
+                            <BookOpen className="mr-3 h-5 w-5" />
+                            {subject.name}
+                          </span>
+                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+
+                        {isOpen && (
+                          <div className="pl-8 space-y-1 mt-1">
+                            <Link
+                              href={`/${slug}/lessons`}
+                              className={cn(
+                                "flex items-center px-3 py-2 text-sm rounded-md hover:bg-muted",
+                                pathname === `/${slug}/lessons` ? "bg-primary/10 text-primary" : "",
+                              )}
+                            >
+                              <NotebookText className="mr-3 h-4 w-4" />
+                              Lessons
+                            </Link>
+                            <Link
+                              href={`/${slug}/lesson-plans`}
+                              className={cn(
+                                "flex items-center px-3 py-2 text-sm rounded-md hover:bg-muted",
+                                pathname === `/${slug}/lesson-plans` ? "bg-primary/10 text-primary" : "",
+                              )}
+                            >
+                              <FileText className="mr-3 h-4 w-4" />
+                              Lesson Plans
+                            </Link>
+                            <Link
+                              href={`/${slug}/slide-decks`}
+                              className={cn(
+                                "flex items-center px-3 py-2 text-sm rounded-md hover:bg-muted",
+                                pathname === `/${slug}/slide-decks` ? "bg-primary/10 text-primary" : "",
+                              )}
+                            >
+                              <Presentation className="mr-3 h-4 w-4" />
+                              Slide Decks
+                            </Link>
+                            <Link
+                              href={`/${slug}/classes`}
+                              className={cn(
+                                "flex items-center px-3 py-2 text-sm rounded-md hover:bg-muted",
+                                pathname === `/${slug}/classes` ? "bg-primary/10 text-primary" : "",
+                              )}
+                            >
+                              <School className="mr-3 h-4 w-4" />
+                              Classes
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </nav>
           </SidebarContent>
           <SidebarFooter>
@@ -259,7 +478,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div className="flex items-center gap-4">
                 <p className="text-sm text-muted-foreground hidden sm:flex items-center">
-                  Welcome back, <span className="font-medium ml-1 mr-3">{user?.userInfo?.firstName || "User"}</span>
+                  Welcome back, <span className="font-medium ml-1 mr-3">{userInfo?.firstName || "User"}</span>
                   {/* Theme toggle button */}
                   <Button
                     variant="ghost"
@@ -274,8 +493,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
                 {/* Avatar with no dropdown or hover effects */}
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.user_metadata?.avatar_url} />
-                  <AvatarFallback className="bg-pelican text-white">{getInitials()}</AvatarFallback>
+                  {avatarUrl ? (
+                    <AvatarImage src={avatarUrl || "/placeholder.svg"} alt="User avatar" />
+                  ) : (
+                    <AvatarFallback className="bg-pelican text-white">{userInitials}</AvatarFallback>
+                  )}
                 </Avatar>
               </div>
             </div>
