@@ -71,8 +71,8 @@
     "@tiptap/starter-kit": "latest",
     "@tiptap/extension-underline": "latest",
     "@tailwindcss/typography": "latest",
-    "@supabase/auth-helpers-nextjs": "latest",
-    "@hello-pangea/dnd": "latest"
+    "@hello-pangea/dnd": "latest",
+    "@supabase/auth-helpers-nextjs": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
