@@ -20,113 +20,146 @@ interface Subject {
 async function getLessonsForSlug(slug: string) {
   console.log("Getting lessons for slug:", slug)
 
-  // First, check if the invitation_code_usage_view table has any data at all
-  const { data: sampleData, error: sampleError } = await supabase
-    .from("invitation_code_usage_view")
-    .select("name, subject_id")
-    .limit(1)
-
-  if (sampleError) {
-    console.error("Error accessing invitation_code_usage_view table:", sampleError)
-    console.log("The invitation_code_usage_view table might not exist or is inaccessible")
-  } else {
-    console.log("Sample data from invitation_code_usage_view:", sampleData)
-  }
-
-  // Try to get all subjects first as our primary approach
-  const { data: subjects, error: subjectsError } = await supabase.from("subjects").select("subject_id, name") // Changed from id to subject_id
-
-  if (subjectsError) {
-    console.error("Error fetching subjects:", subjectsError)
-    return { subjectName: slug, lessons: [] }
-  }
-
-  console.log("All subjects:", subjects)
-
-  // Try different ways to match the slug to a subject
-  let matchingSubject = null
-
-  // 1. Direct match on name
-  matchingSubject = subjects?.find((s) => s.name.toLowerCase() === slug.toLowerCase())
-
-  // 2. Match on hyphenated name
-  if (!matchingSubject) {
-    matchingSubject = subjects?.find((s) => s.name.toLowerCase().replace(/\s+/g, "-") === slug.toLowerCase())
-  }
-
-  // 3. Match on name with spaces instead of hyphens
-  if (!matchingSubject) {
-    const slugWithSpaces = slug.replace(/-/g, " ")
-    matchingSubject = subjects?.find((s) => s.name.toLowerCase() === slugWithSpaces.toLowerCase())
-  }
-
-  // 4. Partial match
-  if (!matchingSubject) {
-    matchingSubject = subjects?.find(
-      (s) => slug.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(slug.toLowerCase()),
+  try {
+    // Log environment information to help diagnose issues
+    console.log(
+      "Environment check - NEXT_PUBLIC_SUPABASE_URL:",
+      process.env.NEXT_PUBLIC_SUPABASE_URL ? "Set" : "Not set",
     )
-  }
 
-  // If we still don't have a match, try to get the subject_id from invitation_code_usage_view
-  if (!matchingSubject && sampleData && sampleData.length > 0) {
-    console.log("Trying to find subject_id in invitation_code_usage_view for slug:", slug)
-
-    const { data: invitationData } = await supabase
+    // First, check if the invitation_code_usage_view table has any data at all
+    const { data: sampleData, error: sampleError } = await supabase
       .from("invitation_code_usage_view")
       .select("name, subject_id")
-      .ilike("name", `%${slug}%`)
+      .limit(1)
 
-    console.log("Invitation data for slug:", invitationData)
+    if (sampleError) {
+      console.error("Error accessing invitation_code_usage_view table:", sampleError)
+      console.log("The invitation_code_usage_view table might not exist or is inaccessible")
+    } else {
+      console.log("Sample data from invitation_code_usage_view:", sampleData)
+    }
 
-    if (invitationData && invitationData.length > 0) {
-      const subjectId = invitationData[0].subject_id
+    // Try to get all subjects first as our primary approach
+    const { data: subjects, error: subjectsError } = await supabase.from("subjects").select("subject_id, name")
 
-      // Find the subject with this ID
-      matchingSubject = subjects?.find((s) => s.subject_id === subjectId) // Changed from id to subject_id
+    if (subjectsError) {
+      console.error("Error fetching subjects:", subjectsError)
+      return { subjectName: slug, lessons: [] }
+    }
 
-      if (!matchingSubject && subjectId) {
-        // If we have a subject_id but no matching subject, create a placeholder
-        matchingSubject = { subject_id: subjectId, name: invitationData[0].name || slug } // Changed from id to subject_id
+    console.log("All subjects:", subjects)
+
+    // Try different ways to match the slug to a subject
+    let matchingSubject = null
+
+    // 1. Direct match on name
+    matchingSubject = subjects?.find((s) => s.name.toLowerCase() === slug.toLowerCase())
+    if (matchingSubject) console.log("Found direct match on name:", matchingSubject)
+
+    // 2. Match on hyphenated name
+    if (!matchingSubject) {
+      matchingSubject = subjects?.find((s) => s.name.toLowerCase().replace(/\s+/g, "-") === slug.toLowerCase())
+      if (matchingSubject) console.log("Found match on hyphenated name:", matchingSubject)
+    }
+
+    // 3. Match on name with spaces instead of hyphens
+    if (!matchingSubject) {
+      const slugWithSpaces = slug.replace(/-/g, " ")
+      matchingSubject = subjects?.find((s) => s.name.toLowerCase() === slugWithSpaces.toLowerCase())
+      if (matchingSubject) console.log("Found match on name with spaces:", matchingSubject)
+    }
+
+    // 4. Partial match
+    if (!matchingSubject) {
+      matchingSubject = subjects?.find(
+        (s) => slug.toLowerCase().includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(slug.toLowerCase()),
+      )
+      if (matchingSubject) console.log("Found partial match:", matchingSubject)
+    }
+
+    // If we still don't have a match, try to get the subject_id from invitation_code_usage_view
+    if (!matchingSubject && sampleData && sampleData.length > 0) {
+      console.log("Trying to find subject_id in invitation_code_usage_view for slug:", slug)
+
+      // Try with spaces instead of hyphens
+      const slugWithSpaces = slug.replace(/-/g, " ")
+
+      const { data: invitationData } = await supabase
+        .from("invitation_code_usage_view")
+        .select("name, subject_id")
+        .or(`name.ilike.%${slug}%,name.ilike.%${slugWithSpaces}%`)
+
+      console.log("Invitation data for slug:", invitationData)
+
+      if (invitationData && invitationData.length > 0) {
+        const subjectId = invitationData[0].subject_id
+
+        // Find the subject with this ID
+        matchingSubject = subjects?.find((s) => s.subject_id === subjectId)
+
+        if (!matchingSubject && subjectId) {
+          // If we have a subject_id but no matching subject, create a placeholder
+          matchingSubject = { subject_id: subjectId, name: invitationData[0].name || slug }
+          console.log("Created placeholder subject from invitation data:", matchingSubject)
+        }
       }
     }
-  }
 
-  // If we still don't have a match, use the first subject as a fallback
-  if (!matchingSubject && subjects && subjects.length > 0) {
-    console.log("No matching subject found, using first subject as fallback")
-    matchingSubject = subjects[0]
-  }
+    // If we still don't have a match, use the first subject as a fallback
+    if (!matchingSubject && subjects && subjects.length > 0) {
+      console.log("No matching subject found, using first subject as fallback")
+      matchingSubject = subjects[0]
+    }
 
-  // If we still don't have a subject, create a placeholder
-  if (!matchingSubject) {
-    console.log("No subjects found at all, creating placeholder")
-    matchingSubject = { subject_id: "unknown", name: slug.replace(/-/g, " ") } // Changed from id to subject_id
-  }
+    // If we still don't have a subject, create a placeholder
+    if (!matchingSubject) {
+      console.log("No subjects found at all, creating placeholder")
+      matchingSubject = { subject_id: "unknown", name: slug.replace(/-/g, " ") }
+    }
 
-  console.log("Using subject:", matchingSubject)
+    console.log("Using subject:", matchingSubject)
 
-  // Now get lessons for this subject
-  const { data: lessons, error: lessonsError } = await supabase
-    .from("lessons")
-    .select("*")
-    .eq("subject_id", matchingSubject.subject_id) // Changed from id to subject_id
-    .order("lesson_name", { ascending: true })
+    // Now get lessons for this subject
+    const { data: lessons, error: lessonsError } = await supabase
+      .from("lessons")
+      .select("*")
+      .eq("subject_id", matchingSubject.subject_id)
+      .order("lesson_name", { ascending: true })
 
-  if (lessonsError) {
-    console.error("Error fetching lessons:", lessonsError)
+    if (lessonsError) {
+      console.error("Error fetching lessons:", lessonsError)
+      return {
+        subjectName: matchingSubject.name,
+        lessons: [],
+      }
+    }
+
+    console.log(
+      `Found ${lessons?.length || 0} lessons for subject ${matchingSubject.name} (ID: ${matchingSubject.subject_id})`,
+    )
+
+    // If no lessons found, try a more permissive query as fallback
+    if (!lessons || lessons.length === 0) {
+      console.log("No lessons found with exact subject_id match, trying to get any lessons")
+
+      // Get a sample of lessons to see if the table has data
+      const { data: sampleLessons, error: sampleLessonsError } = await supabase.from("lessons").select("*").limit(5)
+
+      if (sampleLessonsError) {
+        console.error("Error fetching sample lessons:", sampleLessonsError)
+      } else {
+        console.log("Sample lessons data:", sampleLessons)
+      }
+    }
+
     return {
       subjectName: matchingSubject.name,
-      lessons: [],
+      lessons: lessons || [],
     }
-  }
-
-  console.log(
-    `Found ${lessons?.length || 0} lessons for subject ${matchingSubject.name} (ID: ${matchingSubject.subject_id})`,
-  ) // Changed from id to subject_id
-
-  return {
-    subjectName: matchingSubject.name,
-    lessons: lessons || [],
+  } catch (error) {
+    console.error("Unexpected error in getLessonsForSlug:", error)
+    return { subjectName: slug.replace(/-/g, " "), lessons: [] }
   }
 }
 

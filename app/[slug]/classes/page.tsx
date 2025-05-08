@@ -11,55 +11,89 @@ interface ClassItem {
   created_at: string
 }
 
+// Replace the existing getClassesForSlug function with this enhanced version:
 async function getClassesForSlug(slug: string) {
   try {
     console.log(`Getting classes for slug: ${slug}`)
+    console.log(
+      "Environment check - NEXT_PUBLIC_SUPABASE_URL:",
+      process.env.NEXT_PUBLIC_SUPABASE_URL ? "Set" : "Not set",
+    )
 
     // Get current authenticated user
     const { data: authData, error: authError } = await supabase.auth.getUser()
 
-    if (authError || !authData.user) {
+    if (authError) {
       console.error("Error getting authenticated user:", authError)
+      return { classes: [], subjectName: slug.replace(/-/g, " ") }
+    }
+
+    if (!authData || !authData.user) {
+      console.error("No authenticated user found")
       return { classes: [], subjectName: slug.replace(/-/g, " ") }
     }
 
     const userId = authData.user.id
     console.log(`Current authenticated user ID: ${userId}`)
 
+    // First, check if the invitation_code_usage_view table has any data at all
+    const { data: sampleViewData, error: sampleViewError } = await supabase
+      .from("invitation_code_usage_view")
+      .select("*")
+      .limit(1)
+
+    if (sampleViewError) {
+      console.error("Error accessing invitation_code_usage_view table:", sampleViewError)
+    } else {
+      console.log("Sample data from invitation_code_usage_view:", sampleViewData)
+    }
+
     // First, get the subject_id from the invitation_code_usage_view table
+    const slugWithSpaces = slug.replace(/-/g, " ")
     const { data: subjectData, error: subjectError } = await supabase
       .from("invitation_code_usage_view")
       .select("subject_id, name")
-      .ilike("name", slug.replace(/-/g, " "))
+      .or(`name.ilike.%${slug}%,name.ilike.%${slugWithSpaces}%`)
       .limit(1)
 
     if (subjectError) {
       console.error("Error fetching from invitation_code_usage_view:", subjectError)
-      return { classes: [], subjectName: slug.replace(/-/g, " ") }
+    } else {
+      console.log("Subject data from invitation_code_usage_view:", subjectData)
     }
 
-    if (!subjectData || subjectData.length === 0) {
+    let subjectId = null
+    let subjectName = slug.replace(/-/g, " ")
+
+    if (subjectData && subjectData.length > 0) {
+      subjectId = subjectData[0].subject_id
+      subjectName = subjectData[0].name || subjectName
+      console.log(`Found subject in invitation_code_usage_view: ${subjectName} with ID: ${subjectId}`)
+    } else {
       console.log("No subject found in invitation_code_usage_view, trying subjects table")
 
       // Try to find the subject directly in the subjects table
       const { data: directSubjectData, error: directSubjectError } = await supabase
         .from("subjects")
         .select("subject_id, name")
-        .or(`name.ilike.${slug.replace(/-/g, " ")},name.ilike.${slug.replace(/-/g, "%")}`)
+        .or(`name.ilike.%${slug}%,name.ilike.%${slugWithSpaces}%`)
         .limit(1)
 
-      if (directSubjectError || !directSubjectData || directSubjectData.length === 0) {
-        console.error("Error or no results from subjects table:", directSubjectError)
-        return { classes: [], subjectName: slug.replace(/-/g, " ") }
+      if (directSubjectError) {
+        console.error("Error fetching from subjects table:", directSubjectError)
+      } else if (directSubjectData && directSubjectData.length > 0) {
+        subjectId = directSubjectData[0].subject_id
+        subjectName = directSubjectData[0].name || subjectName
+        console.log(`Found subject in subjects table: ${subjectName} with ID: ${subjectId}`)
+      } else {
+        console.log("No subject found in subjects table either")
+
+        // Get a sample of subjects to see what's available
+        const { data: sampleSubjects } = await supabase.from("subjects").select("subject_id, name").limit(5)
+
+        console.log("Sample subjects available:", sampleSubjects)
       }
-
-      subjectData[0] = directSubjectData[0]
     }
-
-    const subjectId = subjectData[0]?.subject_id
-    const subjectName = subjectData[0]?.name || slug.replace(/-/g, " ")
-
-    console.log(`Found subject: ${subjectName} with ID: ${subjectId}`)
 
     if (!subjectId) {
       console.error("No subject_id found for slug:", slug)
@@ -76,17 +110,40 @@ async function getClassesForSlug(slug: string) {
 
     if (classesError) {
       console.error("Error fetching classes:", classesError)
-      return { classes: [], subjectName }
+    } else {
+      console.log(`Found ${classes?.length || 0} classes for subject: ${subjectName} and teacher: ${userId}`)
     }
 
-    console.log(`Found ${classes?.length || 0} classes for subject: ${subjectName} and teacher: ${userId}`)
+    // If no classes found, check if the classes table has any data
+    if (!classes || classes.length === 0) {
+      const { data: sampleClasses, error: sampleClassesError } = await supabase.from("classes").select("*").limit(5)
+
+      if (sampleClassesError) {
+        console.error("Error fetching sample classes:", sampleClassesError)
+      } else {
+        console.log("Sample classes available:", sampleClasses)
+
+        // Try a more permissive query without teacher_id filter
+        const { data: subjectClasses, error: subjectClassesError } = await supabase
+          .from("classes")
+          .select("*")
+          .eq("subject_id", subjectId)
+          .limit(5)
+
+        if (subjectClassesError) {
+          console.error("Error fetching classes by subject only:", subjectClassesError)
+        } else {
+          console.log(`Classes for subject ${subjectId} without teacher filter:`, subjectClasses)
+        }
+      }
+    }
 
     return {
       classes: (classes as ClassItem[]) || [],
       subjectName,
     }
   } catch (error) {
-    console.error("Error in getClassesForSlug:", error)
+    console.error("Unexpected error in getClassesForSlug:", error)
     return { classes: [], subjectName: slug.replace(/-/g, " ") }
   }
 }
